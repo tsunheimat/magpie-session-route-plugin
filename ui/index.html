@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <title>Session Routing</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="bridge.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#request-list">Skip to requests</a>
+  <main id="session-routing">
+    <header class="page-header">
+      <div><p class="eyebrow">Read-only observability</p><h1>Session Routing</h1></div>
+      <div class="header-actions">
+        <span id="connection-status" data-testid="connection-status" class="status" role="status">Connecting</span>
+        <button id="refresh" type="button">Refresh</button>
+      </div>
+    </header>
+    <p id="last-updated" class="muted">No gateway update received yet.</p>
+    <div id="notice" class="notice" role="status" hidden></div>
+
+    <section class="filters" aria-label="Session and history filters">
+      <label class="search-field" for="session-search">Find a session
+        <input id="session-search" type="search" placeholder="Agent or session ID" autocomplete="off" spellcheck="false" maxlength="256">
+      </label>
+      <label for="session-filter">Show
+        <select id="session-filter"><option value="recent">Active &amp; recent</option><option value="active">Active only</option></select>
+      </label>
+      <label class="session-field" for="session-select">Session
+        <select id="session-select" aria-describedby="session-hint"><option value="">All sessions</option></select>
+      </label>
+      <label for="period-select">Coverage
+        <select id="period-select"><option value="live">Live trace</option><option value="today">Today</option><option value="7d">7 days</option><option value="30d">30 days</option></select>
+      </label>
+      <label class="checkbox" for="include-children"><input id="include-children" type="checkbox" disabled> Include child/subagent traffic</label>
+      <button id="all-sessions" type="button" class="quiet">All sessions</button>
+    </section>
+    <p id="session-hint" class="muted">Sessions are discovered from gateway traffic, including remote agents.</p>
+    <p id="storage-note" class="muted small" hidden>Selection is kept in this frame only. Magpie’s sandbox blocks browser storage; reopening the page starts with All sessions.</p>
+
+    <section aria-labelledby="summary-heading">
+      <div class="section-heading"><h2 id="summary-heading">Scope summary</h2><span id="scope-label" class="muted">All sessions · direct traffic</span></div>
+      <p id="coverage" data-testid="coverage" class="coverage">Coverage is not available until the service answers.</p>
+      <dl id="metrics" class="metrics" aria-describedby="coverage"></dl>
+      <p id="measurement-note" class="muted small">Unknown values are shown as —. Active means an unfinished gateway request, not an agent’s overall task.</p>
+    </section>
+
+    <section class="routes-section" aria-labelledby="routes-heading">
+      <div class="section-heading"><h2 id="routes-heading">Observed routes</h2><button id="clear-focus" class="quiet" type="button" hidden>Show scope routes</button></div>
+      <p id="graph-note" class="muted">Choose a request to inspect its recorded path without changing the summary’s scope.</p>
+      <ul class="legend" aria-label="Route states">
+        <li><span class="state-symbol state-candidate" aria-hidden="true"></span>Eligible / candidate</li>
+        <li><span class="state-symbol state-attempting" aria-hidden="true"></span>Attempting</li>
+        <li><span class="state-symbol state-success" aria-hidden="true"></span>Success</li>
+        <li><span class="state-symbol state-failed" aria-hidden="true"></span>Failed</li>
+        <li>Retry = same candidate</li><li>Fallback = different candidate</li>
+      </ul>
+      <div id="replay-controls" class="replay-controls" hidden>
+        <button id="replay-prev" type="button">Previous attempt</button>
+        <span id="replay-status" role="status"></span>
+        <button id="replay-next" type="button">Next attempt</button>
+        <button id="replay-exit" type="button" class="quiet">Exit replay</button>
+      </div>
+      <div id="route-graph" class="route-graph" aria-label="Session-scoped routing paths"><p class="empty">Waiting for the service. No traffic is assumed.</p></div>
+      <button id="show-more-routes" class="quiet" type="button" hidden>Show all loaded routes</button>
+    </section>
+
+    <section aria-labelledby="requests-heading">
+      <div class="section-heading"><h2 id="requests-heading">Request timeline</h2><span id="request-count" class="muted"></span></div>
+      <p class="muted small">Newest first. Expand a request for recorded attempts and measurements. Historical usage does not reconstruct an attempt trace.</p>
+      <div id="request-list" class="request-list" tabindex="-1"><p class="empty">No snapshot loaded.</p></div>
+      <div class="pagination"><span id="pagination-status" class="muted"></span><button id="load-more" type="button" hidden>Load older requests</button></div>
+    </section>
+    <footer>Metadata only. No prompts, response bodies, headers, or account credentials. The original Routing page and Routing Groups editor remain unchanged.</footer>
+    <noscript>Enable JavaScript to inspect Session Routing telemetry.</noscript>
+  </main>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <title>Session Routing</title>
+  <style>
+    :root { color-scheme: light; --bg: #fcfcfb; --fg: #0b0b0b; --muted: #52514e; --accent: #4f46e5; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --bg: #1a1a19; --fg: #f0efec; --muted: #c3c2b7; --accent: #a5b4fc; } }
+    :root[data-theme="dark"] { color-scheme: dark; --bg: #1a1a19; --fg: #f0efec; --muted: #c3c2b7; --accent: #a5b4fc; }
+    body { margin: 0; padding-inline: 16px; padding-block: 40px; background: var(--magpie-bg, var(--bg)); color: var(--magpie-fg, var(--fg)); font: 14px/1.6 system-ui, sans-serif; }
+    main { max-width: 42rem; margin-inline: auto; }
+    h1 { font-size: 22px; }
+    p { color: var(--magpie-fg-2, var(--muted)); overflow-wrap: anywhere; }
+    button { min-height: 40px; padding: 6px 16px; font: inherit; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 6px; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    [hidden] { display: none !important; }
+  </style>
+  <script src="_magpie/bridge.js" defer></script>
+  <script src="boot.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>Session Routing</h1>
+    <p id="launch-status" role="status" aria-live="polite">Connecting to the Magpie page bridge…</p>
+    <button id="launch-setup" type="button" hidden>Set up secure access</button>
+    <button id="launch-retry" type="button" hidden>Try again</button>
+    <noscript><p>JavaScript is required to open this read-only routing view.</p></noscript>
+  </main>
+</body>
+</html>

@@ -1,0 +1,49 @@
+{
+  "name": "magpie-session-routing",
+  "version": "0.1.0",
+  "description": "Read-only, session-isolated routing observability for Magpie WebUI",
+  "type": "module",
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "lib/",
+    "page/",
+    "ui/",
+    "README.md",
+    "docs/compatibility.md",
+    "docs/validation.md"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "node --test test/browser/*.test.mjs",
+    "test:magpie": "node test/magpie/run.mjs",
+    "check": "node scripts/check.mjs"
+  },
+  "engines": {
+    "node": ">=22",
+    "bun": ">=1.4.2",
+    "magpie": ">=0.1.3124"
+  },
+  "magpie": {
+    "name": "Session Routing",
+    "page": {
+      "title": "Session Routing",
+      "file": "page/index.html",
+      "icon": "page/icon.svg",
+      "service": {
+        "port": 3496,
+        "option": "port"
+      }
+    },
+    "options": {
+      "port": 3496,
+      "showFolders": false
+    }
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
