@@ -14,8 +14,9 @@ const alpha = sessionKey('claude-code', 'session-alpha');
 const bravo = sessionKey('claude-code', 'session-bravo');
 const codex = sessionKey('codex', 'session-alpha');
 
-async function contextFor(browser, harness, viewport = { width: 1280, height: 900 }) {
-  const context = await browser.newContext({ viewport, reducedMotion: 'reduce' });
+async function contextFor(browser, harness, viewport = { width: 1280, height: 900 }, reducedMotion = 'reduce') {
+  const context = await browser.newContext({ viewport, reducedMotion, hasTouch: viewport.width <= 660 });
+  context.setDefaultTimeout(10_000);
   await context.route('**/*', route => {
     const url = new URL(route.request().url());
     return url.hostname === '127.0.0.1' ? route.continue() : route.abort();
@@ -25,10 +26,24 @@ async function contextFor(browser, harness, viewport = { width: 1280, height: 90
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(harness.url);
   const frame = page.frameLocator('iframe');
+  await frame.locator('button').first().waitFor();
+  // Headless WebKit occasionally suspends RAF presentation after changing pages,
+  // including newly opened contexts. Native input wakes it before stability-based
+  // actions; no forced click, retry, disabled animation, or test-only UI mutation.
+  if (engineName === 'webkit') {
+    await page.mouse.move(viewport.width / 2, viewport.height / 2);
+    await page.mouse.wheel(0, 1);
+  }
   return { context, page, frame, errors };
 }
 
+async function disclose(frame, selector = '#evidence-details') {
+  const details = frame.locator(selector);
+  if (!(await details.evaluate(element => element.open))) await details.locator(':scope > summary').click();
+}
+
 async function metric(frame, name, value) {
+  await disclose(frame);
   const locator = frame.locator(`[data-testid="metric-${name}"]`);
   await locator.waitFor();
   const until = Date.now() + 10_000;
@@ -49,9 +64,151 @@ async function select(frame, value, count) {
   await metric(frame, 'requests', count);
 }
 
-await test(`${engineName}: session routing through an opaque-origin page-service bridge`, { timeout: 180_000 }, async t => {
+async function waitUntil(check, message) {
+  const deadline = Date.now() + 10_000;
+  while (!(await check())) {
+    assert(Date.now() < deadline, message);
+    await new Promise(resolve => setTimeout(resolve, 40));
+  }
+}
+
+function serviceFrame(page) {
+  return page.frames().find(frame => frame.url().includes('/_magpie/service/'));
+}
+
+async function readyStage(page, frame) {
+  await frame.locator('[data-testid="graph-request"]').first().waitFor();
+  const service = serviceFrame(page);
+  await service.waitForFunction(() => [...document.querySelectorAll('[data-testid="route-wire"]')]
+    .every(path => path.getAttribute('d')?.includes('C')));
+  return service;
+}
+
+async function noOverflow(service, label) {
+  const bounds = await service.evaluate(() => {
+    const viewport = innerWidth;
+    const offenders = [...document.querySelectorAll('body *')].flatMap(element => {
+      const rect = element.getBoundingClientRect();
+      if (!rect.width || !rect.height || (rect.right <= viewport + 1 && rect.left >= -1 && element.scrollWidth <= element.clientWidth + 1)) return [];
+      const style = getComputedStyle(element);
+      return [{ tag: element.tagName, id: element.id, class: element.getAttribute('class'),
+        left: rect.left, right: rect.right, width: rect.width, display: style.display,
+        minWidth: style.minWidth, maxWidth: style.maxWidth, grid: style.gridTemplateColumns,
+        overflow: style.overflowX, flex: style.flex }];
+    });
+    return { scroll: document.documentElement.scrollWidth, viewport, offenders,
+      bodyOverflow: getComputedStyle(document.body).overflowX,
+      rootOverflow: getComputedStyle(document.documentElement).overflowX };
+  });
+  assert(bounds.scroll <= bounds.viewport + 1, `${label} horizontal overflow: ${JSON.stringify(bounds)}`);
+  assert(!['hidden', 'clip'].includes(bounds.bodyOverflow), 'body must not hide horizontal overflow');
+  assert(!['hidden', 'clip'].includes(bounds.rootOverflow), 'root must not hide horizontal overflow');
+}
+
+async function capture(page, frame, name) {
+  const prefix = new URL(`../../artifacts/browser/${engineName}-${name}`, import.meta.url).pathname;
+  // The default viewport capture is deliberately separate from the full iframe.
+  await page.screenshot({ path: `${prefix}-viewport.png` });
+  const contentHeight = await serviceFrame(page).evaluate(() => document.documentElement.scrollHeight);
+  await page.locator('iframe').evaluate((element, height) => { element.style.height = `${height}px`; }, contentHeight);
+  try {
+    await page.screenshot({ path: `${prefix}.png`, fullPage: true });
+    await frame.locator('#route-graph').screenshot({ path: `${prefix}-routes.png` });
+  } finally {
+    await page.locator('iframe').evaluate(element => { element.style.height = '100%'; });
+  }
+}
+
+function denseTrace() {
+  const routes = Array.from({ length: 9 }, (_, index) => {
+    const route = makeRoute(200 + index, { agent: `agent-${'long-selector-label-'.repeat(3)}`,
+      session: `dense-session-${index}-${'x'.repeat(80)}`, model: 'group/long-requested-model-'.repeat(8) });
+    route.order = Array.from({ length: 4 }, (_, candidate) => ({ ...route.order[0],
+      id: `key-${index}-${candidate}`, provider: `provider-${'long-name-'.repeat(9)}`,
+      model: `model-${'long-model-'.repeat(10)}`, name: 'Long provider name' }));
+    route.tries = [{ id: route.order[0].id, model: route.order[0].model, start: route.time, done: false }];
+    return route;
+  });
+  return { ...initialTrace(), seq: 300, routes, ids: routes.map(row => row.id) };
+}
+
+await test(`${engineName}: session routing through an opaque-origin page-service bridge`, { timeout: 240_000 }, async t => {
   const browser = await engine.launch({ headless: true });
   t.after(() => browser.close());
+
+  await t.test('diagram-first stage keeps concurrent identities and surviving nodes across polls', async t => {
+    const harness = await browserHarness(); t.after(() => harness.close());
+    const { context, page, frame, errors } = await contextFor(browser, harness); t.after(() => context.close());
+    const service = await readyStage(page, frame);
+    assert.equal(await frame.locator('[data-testid="routing-stage"]').count(), 1);
+    assert.equal(await frame.locator('[data-testid="routing-hub"]').count(), 1);
+    assert.equal(await frame.locator('#evidence-details').evaluate(element => element.open), false);
+    assert.equal(await frame.locator('#metrics').isVisible(), false);
+    assert.equal(await frame.locator('[data-testid="request-row"]').count(), 0, 'timeline stays lazy');
+    assert.equal(await frame.locator('[data-testid="graph-request"]').count(), 2);
+    assert.equal(await frame.locator('[data-testid="graph-candidate"]').count(), 4);
+    const destinations = await frame.locator('[data-testid="graph-candidate"]').evaluateAll(rows => rows.map(row => ({
+      scene: row.dataset.sceneKey, request: row.dataset.requestKey,
+      label: row.querySelector('.destination-name').textContent,
+    })));
+    assert.equal(new Set(destinations.map(row => row.scene)).size, 4);
+    const sameLabels = destinations.filter(row => row.label === destinations[0].label);
+    assert.equal(sameLabels.length, 2);
+    assert.equal(new Set(sameLabels.map(row => row.request)).size, 2, 'same-label keys must not merge across requests');
+    const first = frame.locator('[data-testid="graph-request"]').first();
+    const selectedKey = await first.getAttribute('data-request-key');
+    await first.focus();
+    assert.match(await frame.locator('#stage-inspection').innerText(), /session-alpha/);
+    for (const selector of ['[data-testid="route-wire"]', '[data-testid="graph-request"]', '[data-testid="graph-candidate"]']) {
+      const rows = await frame.locator(selector).evaluateAll(elements => elements.map(element => ({
+        request: element.dataset.requestKey, inspected: element.dataset.inspected, dimmed: element.dataset.dimmed,
+      })));
+      assert(rows.every(row => row.inspected === String(row.request === selectedKey)));
+      assert(rows.every(row => row.dimmed === String(row.request !== selectedKey)));
+    }
+    await service.evaluate(() => {
+      window.savedStageNodes = [...document.querySelectorAll('[data-testid="graph-request"], [data-testid="graph-candidate"], [data-testid="route-wire"]')];
+    });
+    const reads = harness.observations.length;
+    await waitUntil(() => harness.observations.length >= reads + 2, 'two unchanged polls must complete');
+    assert.equal(await service.evaluate(() => window.savedStageNodes.every(node => node.isConnected)), true);
+    const update = initialTrace(); update.seq = 6;
+    update.routes = [makeRoute(102, { session: 'session-bravo', done: true, seq: 6, tokens: 900 })];
+    harness.aggregator.applyTrace(update);
+    await frame.locator('#refresh').click();
+    await service.waitForFunction(() => document.querySelector('[data-testid="metric-tokens"]').textContent === '1,100');
+    assert.equal(await service.evaluate(() => window.savedStageNodes.every(node => node.isConnected)), true,
+      'an unrelated session update preserves exact source, destination and path DOM objects');
+    const edge = frame.locator('#route-hit-area path').first();
+    const edgeRequest = await edge.getAttribute('data-request-key');
+    const edgePoint = await edge.evaluate(path => {
+      const point = path.getPointAtLength(path.getTotalLength() * .35);
+      const screen = new DOMPoint(point.x, point.y).matrixTransform(path.getScreenCTM());
+      return { x: screen.x, y: screen.y, hit: document.elementFromPoint(screen.x, screen.y) === path };
+    });
+    assert.equal(edgePoint.hit, true, 'the visible connector has a reachable hit target');
+    const frameBox = await page.locator('iframe').boundingBox();
+    // SVG locator offset origins differ by engine when stroke extends its bounds;
+    // use the actual screen point and native input after verifying hit testing.
+    await page.mouse.move(frameBox.x + edgePoint.x, frameBox.y + edgePoint.y);
+    assert.equal(await frame.locator('[data-testid="graph-request"][data-inspected="true"]').getAttribute('data-request-key'), edgeRequest);
+    await page.mouse.click(frameBox.x + edgePoint.x, frameBox.y + edgePoint.y);
+    assert.equal(await frame.locator('[data-testid="graph-request"]').getAttribute('data-request-key'), edgeRequest);
+    await frame.locator('#clear-focus').click();
+    await first.focus(); await first.press('Enter');
+    assert.equal(await frame.locator('#route-graph').getAttribute('data-mode'), 'focused');
+    assert.equal(await frame.locator('[data-testid="graph-request"]').count(), 1);
+    assert.equal(await frame.locator('#session-select').inputValue(), '');
+    await metric(frame, 'requests', 5);
+    await frame.locator('[data-testid="request-row"]').filter({ hasText: 'Request 101' }).getByRole('button', { name: 'Replay attempts' }).click();
+    assert.equal(await frame.locator('[data-testid="graph-attempt"]').count(), 1);
+    assert.equal(await frame.locator('[data-testid="graph-candidate"][data-highlight="true"]').count(), 1);
+    await frame.locator('#replay-next').click();
+    assert.equal(await frame.locator('[data-testid="graph-attempt"]').count(), 2);
+    assert.match(await frame.locator('#focused-evidence').innerText(), /Fallback · different candidate/);
+    await metric(frame, 'requests', 5);
+    assert.equal(errors.length, 0);
+  });
 
   await t.test('two tabs isolate sessions, same textual IDs and unknown traffic', async t => {
     const harness = await browserHarness();
@@ -180,6 +337,7 @@ await test(`${engineName}: session routing through an opaque-origin page-service
     const harness = await browserHarness({ fixture }); t.after(() => harness.close());
     const { context, frame } = await contextFor(browser, harness); t.after(() => context.close());
     await select(frame, alpha, 1); await metric(frame, 'inFlight', 0);
+    await disclose(frame, '.picker-tools');
     assert.match(await frame.locator('#session-hint').innerText(), /0 unfinished.*selected scope/);
     assert(!((await frame.locator('#session-hint').innerText()).includes('worker-model')));
     const option = await frame.locator('#session-select option:checked').textContent();
@@ -208,6 +366,131 @@ await test(`${engineName}: session routing through an opaque-origin page-service
     assert.match(await frame.locator('#pagination-status').innerText(), /2 of 2 evidence records/);
     assert.match(await frame.locator('#request-list').innerText(), /Billable attempt for request 888/);
     assert(!((await frame.locator('#graph-note').innerText()).includes('Each card is one request')));
+    await frame.locator('[data-testid="request-row"]').filter({ hasText: 'Billable attempt for request 888' })
+      .getByRole('button', { name: 'Focus route' }).click();
+    assert.equal(await frame.locator('[data-testid="graph-candidate"]').count(), 0);
+    assert.equal(await frame.locator('[data-testid="route-wire"]').count(), 0);
+    assert.match(await frame.locator('#route-destinations').innerText(), /Billable evidence only.*topology unavailable/);
+    await metric(frame, 'requests', 1);
+  });
+
+  await t.test('zero-candidate and unmatched evidence never invent destination paths', async t => {
+    const empty = makeRoute(401, { order: [], tries: [] });
+    const unmatched = makeRoute(402, { order: [], tries: [{ id: 'unmatched', model: 'unknown', done: false }] });
+    const fixture = { ...initialTrace(), seq: 402, routes: [empty, unmatched], ids: [401, 402] };
+    const harness = await browserHarness({ fixture }); t.after(() => harness.close());
+    const { context, page, frame } = await contextFor(browser, harness); t.after(() => context.close());
+    await readyStage(page, frame);
+    assert.equal(await frame.locator('[data-testid="graph-candidate"]').count(), 0);
+    assert.equal(await frame.locator('[data-testid="graph-unavailable"]').count(), 2);
+    assert.equal(await frame.locator('[data-testid="route-wire"][data-kind="destination"]').count(), 0);
+    assert.match(await frame.locator('#route-destinations').innerText(), /No candidates recorded/);
+    assert.match(await frame.locator('#graph-note').innerText(), /unmatched attempt.*no destination inferred/);
+  });
+
+  await t.test('normal motion sends once per observed attempt and stops at every lifecycle gate', async t => {
+    let route = makeRoute(301);
+    const other = makeRoute(302, { session: 'session-bravo' });
+    const fixture = { ...initialTrace(), seq: 302, routes: [route, other], ids: [301, 302] };
+    const harness = await browserHarness({ fixture }); t.after(() => harness.close());
+    const { context, page, frame, errors } = await contextFor(browser, harness, { width: 1280, height: 900 }, 'no-preference');
+    t.after(() => context.close());
+    await readyStage(page, frame); await select(frame, alpha, 1);
+    const service = serviceFrame(page);
+    await service.waitForFunction(() => document.querySelector('#route-graph').dataset.motion === 'live');
+    assert.equal(await frame.locator('[data-testid="route-packet"]').count(), 0, 'first snapshot is a baseline');
+    assert(await service.evaluate(() => document.getAnimations().some(animation => animation.playState === 'running')),
+      'the normal-motion context actually runs active-route animations');
+    await service.evaluate(() => {
+      window.flightEvents = [];
+      new MutationObserver(records => {
+        for (const record of records) for (const element of record.addedNodes) {
+          if (element.dataset?.testid === 'route-packet') window.flightEvents.push({
+            key: element.dataset.attemptKey, request: element.dataset.requestKey, index: element.dataset.attemptIndex,
+          });
+        }
+      }).observe(document.querySelector('#route-sky'), { childList: true });
+    });
+    let seq = 302, expectedFlights = 0;
+    const refresh = () => frame.locator('#refresh').click();
+    const countFlights = () => service.evaluate(() => window.flightEvents.length);
+    const send = async () => {
+      const attempts = route.tries.map(attempt => ({ ...attempt, done: true, status: 429 }));
+      attempts.push({ id: route.order[0].id, model: route.order[0].model, start: route.time, done: false });
+      route = { ...route, seq: ++seq, tries: attempts, done: false };
+      harness.aggregator.applyTrace({ ...fixture, seq, routes: [route] });
+      await refresh(); expectedFlights++;
+      await waitUntil(async () => await countFlights() === expectedFlights, 'one packet must be added for the new actual attempt');
+      await frame.locator('[data-testid="route-packet"]').waitFor();
+      assert.equal(await frame.locator('[data-testid="route-packet"]').getAttribute('data-attempt-index'), String(route.tries.length));
+    };
+    const stopped = async () => {
+      await service.waitForFunction(() => document.querySelector('#route-graph').dataset.motion === 'stopped');
+      assert.equal(await frame.locator('[data-testid="route-packet"]').count(), 0);
+      assert.equal(await service.evaluate(() => document.getAnimations().filter(animation => animation.playState === 'running').length), 0);
+    };
+    const resumed = async () => {
+      await service.waitForFunction(() => document.querySelector('#route-graph').dataset.motion === 'live');
+      assert.equal(await frame.locator('[data-testid="route-packet"]').count(), 0, 'resuming establishes a baseline, not a send');
+      assert.equal(await countFlights(), expectedFlights);
+    };
+    await send();
+    const packet = frame.locator('[data-testid="route-packet"]');
+    const transform = await packet.getAttribute('transform');
+    await waitUntil(async () => (await packet.getAttribute('transform')) !== transform, 'a live packet must actually move');
+    await packet.waitFor({ state: 'detached' });
+    await refresh();
+    const reads = harness.observations.length;
+    await waitUntil(() => harness.observations.length >= reads + 2, 'unchanged polls complete');
+    assert.equal(await countFlights(), 1, 'polls cannot resend an attempt');
+    harness.aggregator.applyTrace({ ...fixture, seq: ++seq, routes: [{ ...other, seq, tokens: 12 }] });
+    await refresh(); assert.equal(await countFlights(), 1, 'another session update cannot send');
+
+    for (const status of ['stale', 'disconnected']) {
+      await send(); harness.aggregator.setConnection({ status, reason: 'fixture outage' });
+      await refresh(); await stopped();
+      harness.aggregator.setConnection({ status: 'live' }); await refresh(); await resumed();
+    }
+
+    await send(); await page.evaluate(() => window.testVisibility(false)); await stopped();
+    // An attempt arriving while hidden is baseline evidence on resume.
+    route = { ...route, seq: ++seq, tries: [...route.tries.map(attempt => ({ ...attempt, done: true, status: 429 })),
+      { id: route.order[0].id, model: route.order[0].model, start: route.time, done: false }] };
+    harness.aggregator.applyTrace({ ...fixture, seq, routes: [route] });
+    await page.evaluate(() => window.testVisibility(true));
+    await service.waitForFunction(index => [...document.querySelectorAll('.destination-meta small')]
+      .some(element => element.textContent.includes(`#${index} retry`)), route.tries.length);
+    await resumed();
+
+    await send(); await page.emulateMedia({ reducedMotion: 'reduce' }); await stopped();
+    await page.emulateMedia({ reducedMotion: 'no-preference' }); await resumed();
+
+    await send(); await frame.locator('#period-select').selectOption('today');
+    await frame.locator('#connection-status').filter({ hasText: 'History snapshot' }).waitFor(); await stopped();
+    assert.equal(await frame.locator('[data-testid="route-wire"]').count(), 0, 'unavailable history has no invented paths');
+    assert.match(await frame.locator('#route-destinations').innerText(), /Historical topology unavailable/);
+    await frame.locator('#period-select').selectOption('live'); await resumed();
+
+    await send(); await frame.locator('[data-testid="request-replay"]').first().click(); await stopped();
+    await frame.locator('#replay-exit').click(); await resumed();
+
+    await send();
+    route = { ...route, seq: ++seq, done: true, status: 200,
+      tries: route.tries.map((attempt, index) => ({ ...attempt, done: true, status: index === route.tries.length - 1 ? 200 : 429 })) };
+    harness.aggregator.applyTrace({ ...fixture, seq, routes: [route] }); await refresh();
+    await metric(frame, 'inFlight', 0);
+    assert.equal(await frame.locator('[data-testid="route-packet"]').count(), 0, 'completion cancels its flight');
+    await refresh(); assert.equal(await countFlights(), expectedFlights, 'outcome/revision changes cannot send');
+
+    const replacement = createAggregator({ instanceId: 'motion-replacement' });
+    replacement.applyTrace({ ...fixture, seq, routes: [route, other] }, { full: true });
+    replacement.setConnection({ status: 'live' }); harness.replaceProjection(replacement);
+    await refresh(); await frame.locator('#notice').filter({ hasText: /instance changed/ }).waitFor(); await resumed();
+    await select(frame, bravo, 1); await resumed();
+    await select(frame, alpha, 1); await resumed();
+    const events = await service.evaluate(() => window.flightEvents);
+    assert.equal(new Set(events.map(event => event.key)).size, events.length, 'every observed send identity is unique');
+    assert.equal(errors.length, 0);
   });
 
   await t.test('mobile and desktop themes remain usable with no horizontal overflow', async t => {
@@ -217,25 +500,76 @@ await test(`${engineName}: session routing through an opaque-origin page-service
     for (const [name, viewport] of [['desktop', { width: 1280, height: 900 }], ['mobile', { width: 390, height: 844 }]]) {
       const { context, page, frame, errors } = await contextFor(browser, harness, viewport);
       try {
-        await select(frame, alpha, 2);
+        const service = await readyStage(page, frame);
         for (const dark of [false, true]) {
           await page.evaluate(value => window.testTheme(value), dark);
-          const serviceFrame = page.frames().find(f => f.url().includes('/_magpie/service/'));
-          await serviceFrame.waitForFunction(expected => document.documentElement.dataset.theme === expected, dark ? 'dark' : 'light');
-          const widths = await serviceFrame.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: innerWidth }));
-          assert(widths.scroll <= widths.viewport + 1, `${name} horizontal overflow: ${JSON.stringify(widths)}`);
-          // Expand only the fixture host for capture: fullPage does not normally
-          // include an iframe's internal scrollable content.
-          const contentHeight = await serviceFrame.evaluate(() => document.documentElement.scrollHeight);
-          await page.locator('iframe').evaluate((element, height) => { element.style.height = `${height}px`; }, contentHeight);
-          await page.screenshot({ path: new URL(`../../artifacts/browser/${engineName}-${name}-${dark ? 'dark' : 'light'}.png`, import.meta.url).pathname, fullPage: true });
-          await frame.locator('#route-graph').screenshot({ path: new URL(`../../artifacts/browser/${engineName}-${name}-${dark ? 'dark' : 'light'}-routes.png`, import.meta.url).pathname });
-          await page.locator('iframe').evaluate(element => { element.style.height = '100%'; });
+          await service.waitForFunction(expected => document.documentElement.dataset.theme === expected, dark ? 'dark' : 'light');
+          const theme = dark ? 'dark' : 'light';
+          assert.equal(await frame.locator('#evidence-details').evaluate(element => element.open), false);
+          assert.equal(await frame.locator('#metrics').isVisible(), false);
+          const graphBox = await frame.locator('#route-graph').boundingBox();
+          const hubBox = await frame.locator('#route-hub').boundingBox();
+          assert(graphBox.y < viewport.height / 2 && hubBox.y + hubBox.height < viewport.height,
+            'the first viewport must show the diagram and hub, not metrics');
+          await noOverflow(service, `${name} ${theme} closed details`);
+          await capture(page, frame, `${name}-${theme}-default`);
+          const summary = frame.locator('#evidence-details > summary');
+          if (name === 'mobile') await summary.tap();
+          else { await summary.focus(); await summary.press('Enter'); }
+          await metric(frame, 'requests', 5);
+          await noOverflow(service, `${name} ${theme} open details`);
+          await capture(page, frame, `${name}-${theme}-details`);
+          await summary.click();
+          await service.evaluate(() => window.scrollTo(0, 0));
         }
+        await disclose(frame, '.picker-tools');
         await frame.locator('#session-search').focus();
         await frame.locator('#session-search').fill('codex');
         await waitOption(frame, codex);
         await frame.locator('#session-search').fill('');
+        await select(frame, alpha, 2);
+        await noOverflow(service, `${name} selected scope`);
+        await frame.locator('#evidence-details > summary').click();
+        await frame.locator('.picker-tools > summary').click();
+        await service.evaluate(() => window.scrollTo(0, 0));
+        if (name === 'mobile') {
+          await frame.locator('[data-testid="graph-candidate"]').first().locator('button').tap();
+          assert.equal(await frame.locator('[data-testid="graph-request"]').count(), 1);
+          assert.equal(await frame.locator('#session-select').inputValue(), alpha);
+          await frame.locator('#clear-focus').tap();
+        }
+        await capture(page, frame, `${name}-selected-dark`);
+        assert.equal(errors.length, 0);
+      } finally { await context.close(); }
+    }
+  });
+
+  await t.test('bounded dense evidence and long native options fit both widths and themes', async t => {
+    const harness = await browserHarness({ fixture: denseTrace() }); t.after(() => harness.close());
+    for (const [name, viewport] of [['desktop', { width: 1280, height: 900 }], ['mobile', { width: 390, height: 844 }]]) {
+      const { context, page, frame, errors } = await contextFor(browser, harness, viewport);
+      try {
+        const service = await readyStage(page, frame);
+        assert.equal(await frame.locator('[data-testid="graph-request"]').count(), 6);
+        assert.equal(await frame.locator('[data-testid="graph-candidate"]').count(), 12);
+        assert.equal(await frame.locator('[data-testid="graph-candidate"][data-active="true"]').count(), 6,
+          'every displayed request retains its current destination before unused candidates');
+        assert.match(await frame.locator('#graph-note').innerText(), /Not shown: 3 records \(3 active\), 24 candidates/);
+        await disclose(frame, '.picker-tools');
+        await frame.locator('#show-more-routes').click();
+        await metric(frame, 'requests', 9);
+        const detail = frame.locator('[data-testid="request-details"]').first();
+        await detail.locator('summary').click();
+        for (const dark of [false, true]) {
+          await page.evaluate(value => window.testTheme(value), dark);
+          await service.waitForFunction(expected => document.documentElement.dataset.theme === expected, dark ? 'dark' : 'light');
+          await noOverflow(service, `${name} dense ${dark ? 'dark' : 'light'}`);
+        }
+        await capture(page, frame, `${name}-dense-dark`);
+        await detail.locator('summary').click();
+        const option = await frame.locator('#session-select option').nth(1).getAttribute('value');
+        await frame.locator('#session-select').selectOption(option); await metric(frame, 'requests', 1);
+        await noOverflow(service, `${name} long selected native option`);
         assert.equal(errors.length, 0);
       } finally { await context.close(); }
     }

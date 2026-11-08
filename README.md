@@ -15,7 +15,7 @@ The package is named `magpie-session-routing` and is distributed through GitHub;
 Run under the same account and configuration environment as Magpie:
 
 ```sh
-magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.1.0
+magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.2.0
 magpie plugin list
 ```
 
@@ -25,10 +25,16 @@ Run the CLI inside the **existing Magpie container**, not on the Kubernetes host
 
 ```sh
 kubectl exec -n <namespace> <magpie-pod> -c <magpie-container> -- \
-  magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.1.0
+  magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.2.0
 ```
 
 The official image keeps configuration and installed plugins under `/config`; persist that mount with your existing PVC. Leave the container's HOME/XDG environment unchanged. No extra pod, Service, Ingress rule, or exposed plugin port is needed. Refresh the WebUI after installation; a pod restart should normally be unnecessary. Then complete secure first-use setup below. This is a single-instance plugin, not a cross-replica collector.
+
+### Upgrade from v0.1.0
+
+Run the same `magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.2.0` command inside the existing Magpie container. Both versions use the package name `magpie-session-routing`, so Magpie replaces the existing entry and preserves its options and enabled/disabled state. **Do not remove the old entry first**—removal deletes its saved options. Close/reopen Session Routing after the upgrade; previously configured secure access is reused.
+
+`magpie plugin update` alone reinstalls a Git plugin's existing pinned spec; it does not change `#v0.1.0` to the new tag. If you previously installed from a local directory or have multiple entries, inspect `magpie plugin list` and use the appropriate installation path rather than creating another enabled instance.
 
 ### Local directory or archive
 
@@ -78,12 +84,15 @@ A CLI host can receive a temporary service port from Magpie. It must not become 
 
 ## Using the page
 
+**New in v0.2.0:** one native-style routing stage replaces the original card-based interface, with the session picker above it and Details closed initially. The original `v0.1.0` tag remains unchanged.
+
 - **Session picker:** All sessions is global coverage; a particular session uses an exact, case-sensitive `(agent, session)` identity. Equal IDs from different agents do not collide. **Unknown / no session ID** is explicitly unassigned traffic, never a fabricated native session.
 - **Search / Active:** search available agent, title, shortened ID or opt-in folder metadata. Active sessions sort first, then recent activity. A missing reliable title is not guessed. Active means an unfinished **gateway request**, not the agent’s whole task.
 - **Scope:** direct traffic is the default. Include child/subagent traffic only to add confirmed same-agent children and explicit subagent actors. A child with a proven independent native session can be inspected on its own; workers sharing a parent's header are not direct parent traffic. Unconfirmed relationships do not silently join scopes. Picker discovery counts for other sessions are labelled all-actor; the selected session's hint and totals follow the selected scope.
 - **Coverage:** Live uses the bounded trace. Today/7 days/30 days use bounded usage-ledger scans on **gateway-local calendar days**, not browser-local rolling windows. History discovery is period-specific.
-- **Routes:** live route cards represent individual requests. History can also show explicitly labelled unmatched billable-attempt evidence; those records contribute recorded usage, not extra request counts. Candidate/eligible, attempting, success and failure are labelled independently of color. The ordered attempt sequence distinguishes same-candidate retries from candidate changes. Concurrent requests remain separate. Large views initially show twelve loaded routes; **Show all loaded routes** expands them. Mobile stacks the same topology as a readable list.
-- **Timeline / replay:** expand a request for recorded measurements; **Focus route** and **Replay attempts** change only local presentation, never the selected scope or totals. Replay is manual stepping through recorded attempts, not reissuing a request. Historical attempt order is not reconstructed from usage rows.
+- **Routing stage:** one shared diagram connects request/agent nodes through the Magpie hub to compact provider/key/model rows. Each destination is labelled with its request; identical “Key 1” labels from different requests do not establish a shared account. Concurrent requests remain independent. The default stage prioritizes active traffic, or retains recent static evidence when idle. It is bounded to six request lanes and twelve destination rows, with omitted records, active requests and destinations disclosed. **View all records** opens Details rather than creating an unbounded graph. On mobile, agent nodes and the hub sit above the destinations.
+- **Live movement:** curved paths and local bird/packet markers reflect recorded attempts, not predicted routing. Only newly observed, matched in-flight attempts launch a flight; repeated polls do not fabricate new requests. Candidate-only paths and completed requests remain static. Hidden/stale/disconnected/history/replay/reduced-motion states stop live animation. Hover or keyboard focus reveals concise path information; click a source or destination to focus its request.
+- **Details / timeline / replay:** Details is closed initially and contains full metrics, coverage period controls, the request timeline, and recorded-step replay. Expand a request for measurements; **Focus route** and **Replay attempts** change only presentation, never selected scope or totals. Replay does not reissue requests. History without retained attempt evidence shows topology unavailable; unmatched billable-attempt evidence contributes usage, not extra requests. Account inventory, routing mode and quota data are not inferred from candidate counts.
 - **Refresh:** live cached snapshots poll sequentially roughly once per second without overlapping calls. Hidden frames/tabs pause. Reconnect uses bounded backoff. History is an immutable snapshot; a lightweight live-discovery heartbeat checks connection/access without rescanning history or changing its totals. Refresh requests newer coverage and resets pagination. **Load older requests** stays within the same snapshot; expiry is explained and resets it.
 - **Stale data:** the page keeps same-scope cached evidence explicitly stale, with its last gateway update. Selection changes immediately clear old-scope panels and abort pending work. Epoch and exact-scope guards reject late responses. Expiration returns to All sessions only after fresh discovery confirms absence; an outage is not expiration.
 

@@ -1,8 +1,39 @@
 # Validation
 
-This record distinguishes **implemented**, **automatically tested**, and **deployment-verified** behavior. A loopback/protocol fixture is not a Docker, external HTTPS or production agent-process test. Evidence is from this repository’s development run on **2026-11-06**; generated artifacts are excluded from the npm package. The tested runtime bundle SHA256 is `aa132d0e8fb53e55ddd1d1fe330c0635ec131048db14c808ea6001c31162409a`: hash the lexically sorted paths `index.mjs`, `package.json`, and files directly under `lib/`, `page/`, `ui/`, each as UTF-8 path + NUL + file bytes + NUL (19 files). Documentation and tests are not part of that fingerprint.
+This record distinguishes **implemented**, **automatically tested**, and **deployment-verified** behavior. A loopback/protocol fixture is not a Docker, external HTTPS or production agent-process test. Generated artifacts are excluded from the npm package.
 
-## Recorded results
+## v0.2.0 visual redesign — 2026-11-08
+
+Version `0.2.0` replaces the card-based interface with a diagram-first routing stage; the original `v0.1.0` tag remains unchanged. Its runtime fingerprint, calculated by the method below, is `6713f01f546debf1176657b40265f819990dea8356ff327e163299d1c628b3e7`. The backend, launcher, authorization bridge and Magpie reference source were not changed.
+
+| Check | v0.2.0 result |
+|---|---|
+| Unit/API suite | **157/157 passed**, `npm test`, including 40 focused UI tests; no failed/skipped tests. |
+| Chromium | **12/12 passed** (eleven scenarios plus enclosing test), Playwright 1.63.0 / Chromium 153.0.8010.12. `artifacts/browser/chromium-final.log`. |
+| WebKit | **12/12 passed**, Playwright 1.63.0 / WebKit 26.6, using the same verified isolated library runner as the baseline. `artifacts/browser/webkit-final.log`. This is local verification, not a new GitHub CI run or physical-device Safari test. |
+| Package / syntax | **Passed**, `npm run check`: 32 JavaScript files, 22 package files. `git diff --check` passed. |
+| Real Magpie/Bun | **12 checks passed** again with the redesigned package, Magpie v0.1.3124 / Bun 1.4.2 / Node v24.18.0; completion `2026-11-08T15:36:12.387Z`, `referenceUnchanged: true`. Result: `artifacts/integration/run-ChmlQj/result.json` and `artifacts/integration/latest-result.json`. This validates actual host/API integration, not browser rendering through the external deployment. |
+| Default-view inspection | Desktop light/dark and mobile dark screenshots were opened and compared with the native Routing stage. One shared diagram is primary; Details is closed, without an initial metric grid or request log. |
+| Distribution/deployment | GitHub source tag/release `v0.2.0`; not published to npm or installed into the user's cluster by this work. Authentik/Ingress CSP behavior is separate; a successful localhost port-forward does not prove the external HTTPS path works. |
+
+Browser coverage retains two-tab isolation, late-response rejection, setup/privacy, history accounting and replay invariants. New checks cover closed/lazy Details, exact same-label destination separation, bounded omission indicators, source/path interaction, stable DOM nodes and wires across polls, zero-candidate/orphan evidence, and normal-motion flights that do not resend on unchanged snapshots. Motion is tested through completion, stale/disconnected state, parent visibility, reduced motion, history, replay, scope changes and backend replacement. Keyboard/touch, long labels, dense graphs, both themes and open/closed details are exercised.
+
+**WebKit overflow correction:** reproduced 407px document width (743px with long options) at a 390px viewport. The native select's border box fit, but selected-label internals propagated overflow into `.session-field`. Native-select `contain: inline-size layout`, single-line text and ellipsis restored a 390px document without body/root clipping, increased viewports or weaker assertions. Evidence: `artifacts/browser/webkit-overflow-probe.log` and `webkit-overflow-fixed.log`. Headless WebKit's native-input presentation workaround remains documented below; no forced clicks or automatic failure retries were added.
+
+Selected screenshot paths:
+- `artifacts/browser/chromium-desktop-light-default-viewport.png`
+- `artifacts/browser/webkit-desktop-dark-default-viewport.png`
+- `artifacts/browser/webkit-mobile-selected-dark-viewport.png`
+- `artifacts/browser/webkit-desktop-light-details.png`
+- `artifacts/browser/chromium-desktop-dense-dark-routes.png`
+
+The historical results below remain attributable to the released baseline, not to this changed UI.
+
+## Released v0.1.0 baseline — 2026-11-06
+
+The baseline runtime bundle SHA256 is `aa132d0e8fb53e55ddd1d1fe330c0635ec131048db14c808ea6001c31162409a`: hash the lexically sorted paths `index.mjs`, `package.json`, and files directly under `lib/`, `page/`, `ui/`, each as UTF-8 path + NUL + file bytes + NUL (19 files). Documentation and tests are not part of that fingerprint.
+
+### Recorded baseline results
 
 | Check | Result / scope |
 |---|---|
@@ -10,14 +41,14 @@ This record distinguishes **implemented**, **automatically tested**, and **deplo
 | Frontend syntax | `node --check` passed for `page/boot.js`, `ui/bridge.js`, `ui/app.js`. |
 | Reference build | **Passed offline** using Go 1.26.10, Magpie v0.1.3124 commit `3f53fa1f316330b77e5ff6d065a7a56980cafda2`. Provenance: `artifacts/integration/build.json`. |
 | Containment probe | **Passed** before running Magpie: external egress denied, synthetic HOME only, real homes hidden, allowlisted environment and PID namespace. `artifacts/integration/containment-result.json`. |
-| Actual Magpie/Bun integration | **12 checks passed**, Magpie v0.1.3124, genuine Bun 1.4.2, Node v24.18.0. `artifacts/integration/latest-result.json`, completion `2026-11-06T08:15:35.705Z`, `referenceUnchanged: true`. |
+| Actual Magpie/Bun integration | **12 checks passed**, Magpie v0.1.3124, genuine Bun 1.4.2, Node v24.18.0. `artifacts/integration/run-Y5TfkG/result.json`, completion `2026-11-06T08:15:35.705Z`, `referenceUnchanged: true`. |
 | Chromium protocol browser suite | **8/8 passed** (seven scenarios plus enclosing test), Playwright 1.63.0 / Chromium **153.0.8010.12**, cached revision 1243. Command: `PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright" npm run test:browser`. Two-tab isolation, delayed scope changes, partial history, subagent/stale handling, secure first setup, replay reset after backend replacement, direct-only hints, orphan billing labels, mobile/desktop light/dark and no horizontal overflow are asserted. |
 | Chromium replay / visibility smoke | Additional loopback browser assertions **passed** on Chromium 153.0.8010.12: manual replay advances from one to two visible actual attempts; session selection and totals stay unchanged; expanding details reveals ordered attempts; parent visibility false stops API polling and true resumes it. |
 | Screenshot inspection | Generated under `artifacts/browser/`; Chromium desktop light routing topology and Chromium/WebKit mobile dark layouts visually inspected. Labels, candidate-versus-attempt states and fallback sequence are legible. Screenshots complement, not replace, automated assertions. |
 | WebKit protocol browser suite | **8/8 passed in two consecutive full runs** on WebKit **26.6** (revision 2359), Playwright 1.63.0, after the native-input test adjustment described below. One run was concurrent with Chromium. An intermediate unadjusted run failed with a two-tab button-stability timeout; it is not counted as a pass. The passing two-tab scenarios took about 32 seconds: a timed diagnostic attributed about 29.5 seconds to WebKit's native `mouse.move` dispatch, followed by about 44 ms for scrolling and 83 ms for the normal click. This headless scheduling delay remains a test-environment limitation; it is not a measured application update delay. Command: `BROWSER=webkit python3 -I artifacts/webkit-deps/scripts/run.py node --test test/browser/session-routing.test.mjs`. The local runner uses isolated, integrity-verified Ubuntu Noble libraries; it does not install system packages or modify the original browser binaries. |
 | Package / syntax | **Passed**, `node scripts/check.mjs`: 32 JavaScript files syntax-checked; dry-run npm package contains 22 files, with no external UI assets or unexpected development/credential files. |
 | Integrated unit/API suite | **144/144 passed**, `npm test`, no failures/skips. Includes projection/retention/reset, privacy/identity, gateway/collector, history accounting/bounds, security/lifecycle, independent HTTP viewers and the 27 frontend tests. Review regressions cover Codex kind-only workers, independent-child selection, model suffixes/aliases, changing ledger annotations without duplicate billing, full-envelope byte budgets, ownership rotation, bounded response-drain admission/deadlines and cancellation handling. This is separate from browser and actual Magpie integration. |
-| CI workflow | `.github/workflows/test.yml` configures Node 22/24 unit/package checks and separate Chromium/WebKit jobs. The recorded local Node version is v24.18.0; local results are not a claim about remote CI. See the repository's [GitHub Actions runs](https://github.com/tsunheimat/magpie-session-route-plugin/actions) for the current commit's CI status. |
+| Release CI | [Run 42197568529](https://github.com/tsunheimat/magpie-session-route-plugin/actions/runs/42197568529), commit `ba8c9d8`: Node 22 and 24 unit/package jobs and Chromium **passed**. WebKit **failed** the mobile overflow assertion (`scrollWidth: 426`, viewport `390`), despite the earlier local passes. Local results do not override that failure. Version 0.2.0 retains this strict assertion and passes it locally; the result of each later GitHub CI run is separate from this historical failure. |
 | Standard Docker installation | **Not verified** in an actual deployment container. Same-container instructions are supplied; no additional container or exposed port is required by implementation. |
 | Remote HTTPS deployment | **Not verified** through an actual external HTTPS reverse proxy/Ingress. Real-host integration exercises authenticated loopback HTTP proxying. |
 | Real Claude Code/Codex processes | **Not run**. Synthetic clients send the native session headers to real Magpie and deterministic loopback providers. No real provider credentials, agent files or paid calls. |

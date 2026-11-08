@@ -249,9 +249,95 @@
     };
   }
 
+  const sceneKey = (requestKey, candidateKey) => JSON.stringify([requestKey, candidateKey]);
+  const attemptIndex = (attempt, position) => Number.isInteger(attempt.index) && attempt.index > 0 ? attempt.index : position + 1;
+  const isActive = row => row.outcome === 'in-flight' && !attemptEvidence(row);
+  const newest = (a, b) => (Date.parse(b.time) || 0) - (Date.parse(a.time) || 0) || a.key.localeCompare(b.key);
+  // Projection consumes the controller's validated scope only. Neutral labels are
+  // never identities: even a shared hub retains request-qualified ports/edges.
+  function projectScene(data, { focusKey = null, replayIndex = null, maxRequests = 6, maxDestinations = 12 } = {}) {
+    const requests = data?.requests || [], focused = requests.find(row => row.key === focusKey);
+    const active = requests.filter(isActive).sort(newest);
+    const latest = new Map();
+    for (const row of [...requests].sort(newest)) {
+      const session = row.sessionKey ?? JSON.stringify([row.agent ?? null, row.session ?? null]);
+      if (!latest.has(session)) latest.set(session, row);
+    }
+    const recent = data?.scope.kind === 'all' ? [...latest.values()] : [...requests].sort(newest).slice(0, 1);
+    const pool = focused ? [focused] : active.length ? active : recent;
+    const shown = pool.slice(0, Math.max(1, Math.min(6, maxRequests)));
+    const sources = [], possible = [];
+    for (const row of shown) {
+      const replaying = !!focused && replayIndex !== null;
+      const attempts = replaying ? row.attempts.slice(0, Math.max(0, replayIndex + 1)) : row.attempts;
+      const orphan = attemptEvidence(row);
+      const candidates = orphan ? [] : row.candidates;
+      const unmatched = attempts.filter(attempt => !candidates.some(candidate => candidate.key === attempt.candidateKey));
+      sources.push({ key: row.key, row, attempts, active: !replaying && isActive(row), unmatched: unmatched.length, orphan });
+      for (const [position, candidate] of candidates.entries()) {
+        const matched = attempts.filter(attempt => attempt.candidateKey === candidate.key);
+        const last = matched.at(-1), current = last && attempts.at(-1)?.candidateKey === candidate.key;
+        const state = last ? (last.outcome === 'in-flight' ? 'attempting' : last.outcome || 'unknown') : 'candidate';
+        possible.push({ key: sceneKey(row.key, candidate.key), requestKey: row.key, row, candidate, attempts: matched,
+          state, active: !replaying && isActive(row) && !!current && last?.outcome === 'in-flight', current: !!current,
+          rank: current ? 0 : matched.length ? 1 : 2, position });
+      }
+      if (!candidates.length) possible.push({ key: sceneKey(row.key, null), requestKey: row.key, row, candidate: null,
+        attempts: [], state: 'unavailable', active: false, current: false, rank: 3, position: 0,
+        message: orphan ? 'Billable evidence only · topology unavailable' : data?.scope.period !== 'live' ?
+          'Historical topology unavailable' : 'No candidates recorded · route unknown' });
+    }
+    // All current matches precede any earlier attempts, which precede candidates.
+    // This prevents a dense first request from hiding another request's active hop.
+    const destinations = possible.sort((a, b) => a.rank - b.rank || shown.indexOf(a.row) - shown.indexOf(b.row) || a.position - b.position)
+      .slice(0, Math.max(1, Math.min(12, maxDestinations)));
+    return { sources, destinations, focusKey: focused?.key ?? null, replayIndex: focused ? replayIndex : null,
+      mode: focused ? replayIndex !== null ? 'replay' : 'focused' : active.length ? 'active' : 'recent',
+      total: requests.length, active: active.length, omittedRequests: requests.length - shown.length,
+      omittedActive: active.filter(row => !shown.includes(row)).length,
+      omittedDestinations: requests.reduce((n, row) => n + (attemptEvidence(row) ? 0 : row.candidates.length), 0) - destinations.filter(row => row.candidate).length,
+      omittedShownDestinations: possible.length - destinations.length,
+      unmatched: sources.reduce((n, source) => n + source.unmatched, 0) };
+  }
+  function motionNamespace(data) {
+    const scope = data?.scope;
+    return JSON.stringify([data?.instanceId, data?.generation, scope?.kind, scope?.sessionKey, scope?.period, scope?.includeChildren]);
+  }
+  // Pure reducer: first snapshots/resumes establish watermarks, not send events.
+  // Outcome, candidate match, revision and unrelated updates cannot resend a try.
+  function advanceMotion(previous, data, { visible = true, connectionStatus = data?.connection?.status,
+    reducedMotion = false, replaying = false, reset = false } = {}) {
+    const namespace = motionNamespace(data);
+    const enabled = !!data && visible && connectionStatus === 'live' && data.scope.period === 'live' && !reducedMotion && !replaying && !reset;
+    if (previous?.namespace === namespace && previous.saturated) {
+      return { namespace, watermarks: new Map(), enabled, flights: [], baseline: true, saturated: true };
+    }
+    const baseline = !previous || previous.namespace !== namespace || !previous.enabled || !enabled;
+    const watermarks = previous?.namespace === namespace ? new Map(previous.watermarks) : new Map();
+    const flights = [];
+    for (const row of data?.requests || []) {
+      const seen = watermarks.get(row.key) || 0;
+      let highest = seen;
+      for (const [position, attempt] of row.attempts.entries()) {
+        const index = attemptIndex(attempt, position);
+        if (!baseline && index > highest && isActive(row) && attempt.outcome === 'in-flight' && row.candidates.some(candidate => candidate.key === attempt.candidateKey)) {
+          flights.push({ key: JSON.stringify([namespace, row.key, index]), requestKey: row.key,
+            destinationKey: sceneKey(row.key, attempt.candidateKey), index });
+        }
+        highest = Math.max(highest, index);
+      }
+      watermarks.set(row.key, highest);
+    }
+    // At the lifetime identity cap, retain only a saturation flag for this scope
+    // and generation. Pulses still work; forgotten attempts can never resend.
+    if (watermarks.size > 8192) return { namespace, watermarks: new Map(), enabled, flights: [], baseline: true, saturated: true };
+    return { namespace, watermarks, enabled, flights: flights.slice(-12), baseline, saturated: false };
+  }
+
   // Expose only stateless helpers/factory, never this frame’s token or controller.
   window.SessionRouting = Object.freeze({ makeScope, scopeEquals, queryFor, selectSessions,
-    validOptions, validateSnapshot, selectionStore, createController, number, duration, money, attemptEvidence, requestName, selectedSummary });
+    validOptions, validateSnapshot, selectionStore, createController, number, duration, money, attemptEvidence, requestName, selectedSummary,
+    projectScene, sceneKey, advanceMotion });
 
   if (!document.getElementById('session-routing')) return;
   const $ = id => document.getElementById(id);
@@ -264,7 +350,7 @@
   const setText = (id, text) => { if ($(id).textContent !== text) $(id).textContent = text; };
   const storage = selectionStore(() => window.localStorage);
   const savedSelection = storage.read();
-  let view = null, focusKey = null, replayIndex = null, showAllRoutes = false;
+  let view = null, focusKey = null, replayIndex = null;
   let currentScope = makeScope(savedSelection), sessions = [], unknownRequests = 0;
   let lastConnection = { status: 'starting', lastUpdated: null };
   const expanded = new Set();
@@ -329,9 +415,10 @@
     setText('connection-status', historical ? 'History snapshot' : labels[update.status] || 'Unknown connection');
     setText('last-updated', `${lastConnection.lastUpdated ? `Last gateway update: ${time(lastConnection.lastUpdated)}.` : 'No gateway update received yet.'}${lastConnection.reason ? ` ${reasonLabel(lastConnection.reason)}` : ''}`);
     $('session-routing').dataset.stale = String(update.status !== 'live');
+    syncMotion();
     if (!view && !['live', 'starting'].includes(update.status)) {
       setText('coverage', `${PERIOD_LABELS[currentScope.period]} · No authorized snapshot available. Totals are unknown.`);
-      $('route-graph').replaceChildren(node('p', 'empty', 'No routing snapshot is available. Refresh or reopen this page through Magpie.'));
+      setText('stage-empty', 'No routing snapshot is available. Refresh or reopen this page through Magpie.');
       $('request-list').replaceChildren(node('p', 'empty', 'No request snapshot is available. No traffic or completion is inferred.'));
     }
   }
@@ -418,67 +505,260 @@
     focusKey = key; replayIndex = replay ? 0 : null;
     preserveFocus(() => { renderRoutes(); renderTimeline(); });
   }
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = (tag, attributes = {}) => {
+    const element = document.createElementNS(NS, tag);
+    for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
+    return element;
+  };
+  const sourceNodes = new Map(), destinationNodes = new Map(), wireNodes = new Map(), hitNodes = new Map();
+  const flights = new Map();
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let scene = projectScene(null), motion = null, geometryFrame = null, flightFrame = null, pageStopped = false;
+  let pendingFlights = [], inspectionKey = null;
+  // Keep the element itself (and its event handlers) when its evidence changes.
+  function reconcile(parent, cache, items, create, update) {
+    const keys = new Set(items.map(item => item.key));
+    for (const [key, element] of cache) if (!keys.has(key)) { element.remove(); cache.delete(key); }
+    items.forEach((item, index) => {
+      let element = cache.get(item.key);
+      if (!element) { element = create(item); cache.set(item.key, element); }
+      update(element, item);
+      if (parent.children[index] !== element) parent.insertBefore(element, parent.children[index] || null);
+    });
+  }
+  function inspect(key, destinationKey = null) {
+    inspectionKey = key;
+    const source = scene.sources.find(item => item.key === key);
+    const destination = scene.destinations.find(item => item.key === destinationKey);
+    const row = source?.row;
+    if (row) {
+      const info = [requestName(row), row.session || 'Unknown / no session ID', row.group?.name ? `Group: ${row.group.name}` : 'Group not recorded'];
+      if (destination?.candidate) {
+        const { candidate, attempts, state } = destination;
+        info.push(`${candidate.provider || 'Provider unknown'} / ${candidate.label || 'Anonymous candidate'}`, candidate.model || 'Model unknown', STATES[state] || 'Unknown');
+        info.push(attempts.length ? attempts.map((attempt, index) => `#${attemptIndex(attempt, index)} ${attempt.transition || 'unknown'} · ${STATES[attempt.outcome] || 'Unknown'}`).join('; ') : 'No attempt recorded');
+        if (candidate.effort) info.push(`Effort: ${candidate.effort}`);
+      } else if (destination?.message) info.push(destination.message);
+      if (source.unmatched) info.push(`${source.unmatched} unmatched attempt(s); no destination inferred`);
+      if (row.partial) info.push('Partial evidence');
+      setText('stage-inspection', info.join(' · '));
+    } else setText('stage-inspection', 'Select a request or destination to inspect its recorded route. Each row belongs only to its labelled request.');
+    for (const element of [...wireNodes.values(), ...sourceNodes.values(), ...destinationNodes.values()]) {
+      element.dataset.inspected = String(!!key && element.dataset.requestKey === key);
+      element.dataset.dimmed = String(!!key && element.dataset.requestKey !== key);
+    }
+  }
+  function sceneButton(button, key, destinationKey = null) {
+    button.type = 'button'; button.dataset.uiFocus = destinationKey ? `destination-${destinationKey}` : `graph-focus-${key}`;
+    button.setAttribute('aria-describedby', 'stage-inspection');
+    button.addEventListener('pointerenter', () => inspect(key, destinationKey));
+    button.addEventListener('focus', () => inspect(key, destinationKey));
+    button.addEventListener('pointerleave', () => inspect(focusKey));
+    button.addEventListener('blur', () => inspect(focusKey));
+    button.addEventListener('click', () => { focusRequest(key); inspect(key, destinationKey); });
+  }
+  function stopFlights() {
+    if (flightFrame !== null) cancelAnimationFrame(flightFrame);
+    flightFrame = null; pendingFlights = [];
+    for (const flight of flights.values()) flight.element.remove();
+    flights.clear();
+  }
+  function syncMotion() {
+    motion = advanceMotion(motion, view, { visible: !pageStopped && !document.hidden && window.magpie?.visible !== false,
+      connectionStatus: lastConnection.status, reducedMotion: reducedMotion.matches, replaying: replayIndex !== null });
+    $('route-graph').dataset.motion = motion.enabled ? 'live' : 'stopped';
+    if (motion.baseline) stopFlights();
+    if (!motion.enabled) {
+      if (geometryFrame !== null && (pageStopped || document.hidden || window.magpie?.visible === false)) {
+        cancelAnimationFrame(geometryFrame); geometryFrame = null;
+      }
+      return;
+    }
+    for (const [key, flight] of flights) if (wireNodes.get(flight.destinationKey)?.dataset.active !== 'true') { flight.element.remove(); flights.delete(key); }
+    pendingFlights.push(...motion.flights.filter(flight => wireNodes.get(flight.destinationKey)?.dataset.active === 'true'));
+    pendingFlights = pendingFlights.slice(-12);
+    if (pendingFlights.length) scheduleGeometry();
+  }
+  function launchFlights() {
+    if (!motion?.enabled) return;
+    for (const event of pendingFlights) {
+      const paths = [wireNodes.get(JSON.stringify([event.requestKey])), wireNodes.get(event.destinationKey)];
+      if (paths.some(path => !path?.getAttribute('d')) || paths[1].dataset.active !== 'true' || flights.has(event.key) || flights.size >= 12) continue;
+      const lengths = paths.map(path => path.getTotalLength());
+      if (!lengths.every(length => length > 0)) continue;
+      const bird = svg('g', { class: 'route-packet' });
+      bird.dataset.testid = 'route-packet'; bird.dataset.attemptKey = event.key;
+      bird.dataset.requestKey = event.requestKey; bird.dataset.attemptIndex = String(event.index);
+      bird.append(svg('path', { d: 'M-9 4 -2-1 -4-8 3-2Q7-6 9-2L13 0 8 2Q5 8 0 5L-10 8Z' }), svg('circle', { cx: 16, cy: 0, r: 6.2, class: 'packet-dot' }));
+      $('route-sky').append(bird);
+      flights.set(event.key, { ...event, element: bird, paths, lengths, started: null });
+    }
+    pendingFlights = [];
+    if (flights.size && flightFrame === null) flightFrame = requestAnimationFrame(animateFlights);
+  }
+  function animateFlights(now) {
+    flightFrame = null;
+    if (!motion?.enabled) { stopFlights(); return; }
+    for (const [key, flight] of flights) {
+      flight.started ??= now;
+      const progress = Math.min(1, (now - flight.started) / 1100);
+      if (progress === 1) { flight.element.remove(); flights.delete(key); continue; }
+      let distance = progress * (flight.lengths[0] + flight.lengths[1]);
+      const part = distance <= flight.lengths[0] ? 0 : 1;
+      if (part) distance -= flight.lengths[0];
+      const point = flight.paths[part].getPointAtLength(distance);
+      const next = flight.paths[part].getPointAtLength(Math.min(flight.lengths[part], distance + 1));
+      const angle = Math.atan2(next.y - point.y, next.x - point.x) * 180 / Math.PI;
+      flight.element.setAttribute('transform', `translate(${point.x} ${point.y}) rotate(${angle}) scale(.65)`);
+    }
+    if (flights.size) flightFrame = requestAnimationFrame(animateFlights);
+  }
+  function scheduleGeometry() {
+    if (geometryFrame === null && !pageStopped && !document.hidden && window.magpie?.visible !== false) {
+      geometryFrame = requestAnimationFrame(layoutWires);
+    }
+  }
+  function layoutWires() {
+    geometryFrame = null;
+    const bounds = $('route-graph').getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const box = element => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left - bounds.left, right: rect.right - bounds.left, top: rect.top - bounds.top,
+        bottom: rect.bottom - bounds.top, y: rect.top - bounds.top + rect.height / 2 };
+    };
+    const hub = box($('route-hub'));
+    const sources = new Map([...sourceNodes].map(([key, element]) => [key, box(element)]));
+    const destinations = new Map([...destinationNodes].map(([key, element]) => [key, box(element)]));
+    const narrow = getComputedStyle($('route-graph')).getPropertyValue('--stacked').trim() === '1';
+    for (const layer of [$('route-wires'), $('route-hit-area'), $('route-sky')]) layer.setAttribute('viewBox', `0 0 ${bounds.width} ${bounds.height}`);
+    // Read all boxes above, then write geometry once; no DOM box reads per flight.
+    for (const [key, path] of wireNodes) {
+      const source = sources.get(path.dataset.requestKey), target = destinations.get(key);
+      let d;
+      if (!target) {
+        const mid = (source.right + hub.left) / 2;
+        d = `M${source.right},${source.y} C${mid},${source.y} ${mid},${hub.y} ${hub.left},${hub.y}`;
+      } else if (narrow) {
+        const start = (hub.left + hub.right) / 2, lane = 6;
+        d = `M${start},${hub.bottom} C${start},${hub.bottom + 18} ${lane},${hub.bottom + 12} ${lane},${hub.bottom + 32} L${lane},${target.y - 12} Q${lane},${target.y} ${target.left},${target.y}`;
+      } else {
+        const mid = (hub.right + target.left) / 2;
+        d = `M${hub.right},${hub.y} C${mid},${hub.y} ${mid},${target.y} ${target.left},${target.y}`;
+      }
+      if (path.getAttribute('d') !== d) path.setAttribute('d', d);
+      const hit = hitNodes.get(key);
+      if (hit && hit.getAttribute('d') !== d) hit.setAttribute('d', d);
+    }
+    launchFlights();
+  }
+  const stageObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(scheduleGeometry) : null;
+  function observeStage() {
+    for (const id of ['route-graph', 'route-sources', 'route-hub', 'route-destinations']) stageObserver?.observe($(id));
+    scheduleGeometry();
+  }
+  function renderFocusedEvidence() {
+    if (!$('evidence-details').open) return;
+    const row = view?.requests.find(row => row.key === focusKey);
+    $('focused-evidence').hidden = !row;
+    if (!row) { $('focused-evidence').replaceChildren(); return; }
+    const attempts = replayIndex === null ? row.attempts : row.attempts.slice(0, replayIndex + 1);
+    $('focused-evidence').replaceChildren(node('h3', '', `${requestName(row)} · recorded route`),
+      node('p', 'muted small', 'Focus and recorded replay do not change the selected session or its totals.'),
+      attempts.length ? attemptList(row, attempts, true) : node('p', 'muted', 'Attempt history unavailable; no route is inferred.'));
+  }
+  function renderStageSummary() {
+    const focused = view?.requests.find(row => row.key === focusKey);
+    const mode = replayIndex !== null ? 'Recorded replay' : focused ? `${requestName(focused)} · focused` :
+      view?.scope.period !== 'live' ? 'Historical evidence' : scene.active ? `${scene.active} in flight` : 'Latest observed · idle';
+    setText('hub-context', replayIndex !== null ? 'Recorded replay' : view?.scope.period !== 'live' ? 'History' : scene.active ? 'Routing' : 'Recent route');
+    const coverage = view?.coverage.source === 'ledger' ? `${PERIOD_LABELS[currentScope.period]} · fixed ledger snapshot` : 'Recent trace · not lifetime history';
+    setText('graph-note', `${mode} · ${scene.sources.length} of ${scene.total} loaded records · ${coverage}${view?.coverage.partial || view?.metrics.partial ? ' · partial coverage' : ''}` +
+      (scene.omittedRequests || scene.omittedDestinations ? ` · Not shown: ${scene.omittedRequests} records (${scene.omittedActive} active), ${scene.omittedDestinations} candidates. Details has the remaining evidence.` : '') +
+      (scene.unmatched ? ` · ${scene.unmatched} unmatched attempt(s); no destination inferred.` : ''));
+  }
   function renderRoutes() {
-    const requests = view?.requests || [];
-    const focused = requests.find(row => row.key === focusKey);
+    const focused = view?.requests.find(row => row.key === focusKey);
     if (!focused) { focusKey = null; replayIndex = null; }
     if (replayIndex !== null) replayIndex = Math.min(replayIndex, Math.max(0, focused.attempts.length - 1));
-    const ordered = [...requests].sort((a, b) => Number(b.outcome === 'in-flight') - Number(a.outcome === 'in-flight') ||
-      (Date.parse(b.time) || 0) - (Date.parse(a.time) || 0));
-    const shown = focused ? [focused] : showAllRoutes ? ordered : ordered.slice(0, 12);
+    scene = projectScene(view, { focusKey, replayIndex });
+    $('route-graph').dataset.mode = scene.mode;
     $('clear-focus').hidden = !focused;
-    $('show-more-routes').hidden = !!focused || showAllRoutes || ordered.length <= 12;
+    $('show-more-routes').hidden = !scene.omittedRequests && !scene.omittedDestinations && !scene.unmatched;
     $('replay-controls').hidden = replayIndex === null;
     $('replay-prev').disabled = replayIndex === null || replayIndex === 0;
     $('replay-next').disabled = replayIndex === null || replayIndex >= (focused?.attempts.length || 0) - 1;
     setText('replay-status', replayIndex === null ? '' : `Recorded attempt ${replayIndex + 1} of ${focused.attempts.length} · manual replay`);
-    setText('graph-note', focused ? `${requestName(focused)} is focused${replayIndex === null ? '' : ' in recorded-step replay'}. Session selection and scope totals are unchanged.` :
-      `${shown.length} of ${requests.length} loaded evidence records shown; in-flight requests first. Candidate does not mean served. Billable-attempt-only records are labelled separately and do not add to the request count.`);
-    if (!shown.length) {
-      $('route-graph').replaceChildren(node('p', 'empty', view ? 'No observed routes in this scope and coverage. No traffic is inferred.' : 'Loading this scope. Previous-scope routes have been cleared.'));
-      return;
-    }
-    const cards = shown.map(row => {
-      const card = node('article', 'route-card'); card.dataset.testid = 'graph-request'; card.dataset.requestKey = row.key;
-      const heading = node('div', 'route-heading');
-      heading.append(action(requestName(row), `graph-focus-${row.key}`, () => focusRequest(row.key)), badge(row.outcome));
-      if (row.partial) heading.append(node('span', 'muted small', 'Partial evidence'));
-      card.append(heading);
-      const chain = node('div', 'route-chain');
-      const actor = node('div', 'route-node');
-      actor.append(node('small', '', 'Agent / recorded session'), node('strong', '', row.agent || 'Unknown agent'),
-        node('span', '', row.session ? short(row.session) : 'Unknown / no session ID'));
-      if (row.isSubagent || row.subagentId) actor.append(node('small', '', 'Explicit subagent actor'));
-      const gateway = node('div', 'route-node');
-      gateway.append(node('small', '', 'Read-only gateway evidence'), node('strong', '', 'Magpie gateway'), node('span', '', row.group?.name ? `Group: ${row.group.name}` : 'Group not recorded'));
-      const arrow = () => { const value = node('span', 'route-arrow', '→'); value.setAttribute('aria-hidden', 'true'); return value; };
-      const destinations = node('ul', 'route-destinations');
-      const replaying = row.key === focusKey && replayIndex !== null;
-      const attempts = replaying ? row.attempts.slice(0, replayIndex + 1) : row.attempts;
-      for (const candidate of row.candidates) {
-        const matched = attempts.filter(attempt => attempt.candidateKey === candidate.key);
-        const latest = matched.at(-1);
-        const state = replaying ? (latest?.outcome === 'in-flight' ? 'attempting' : latest?.outcome || 'candidate') : candidate.state;
-        const destination = node('li', 'route-destination'); destination.dataset.testid = 'graph-candidate';
-        destination.dataset.state = state || 'unknown';
-        destination.dataset.highlight = String(replaying && attempts.at(-1)?.candidateKey === candidate.key);
-        destination.append(badge(state), node('span', 'destination-label', `${candidate.provider || 'Provider unknown'} / ${candidate.label || 'Anonymous candidate'}`),
-          node('strong', 'destination-label', `→ ${candidate.model || 'Model unknown'}`));
-        if (candidate.effort) destination.append(node('small', 'muted', `Effort: ${candidate.effort}`));
-        destination.append(node('small', 'muted', matched.length ? `${matched.length} recorded attempt(s)` : 'No attempt recorded in this view'));
-        destinations.append(destination);
+    renderStageSummary();
+    $('stage-empty').hidden = !!scene.sources.length;
+    $('route-hub').hidden = !scene.sources.length;
+    setText('stage-empty', view ? 'No observed routes in this scope and coverage. No traffic is inferred.' : 'Loading this scope. Previous-scope routes have been cleared.');
+    reconcile($('route-sources'), sourceNodes, scene.sources, item => {
+      const button = node('button', 'route-source'); sceneButton(button, item.key); return button;
+    }, (button, item) => {
+      const { row } = item;
+      button.dataset.testid = 'graph-request'; button.dataset.requestKey = row.key;
+      button.dataset.active = String(item.active); button.setAttribute('aria-pressed', String(focusKey === row.key));
+      const signature = JSON.stringify([row.agent, row.session, row.model, row.id, row.outcome, row.isSubagent, item.orphan, item.unmatched]);
+      if (button.dataset.content !== signature) {
+        button.dataset.content = signature;
+        const icon = node('span', 'agent-glyph', '>_'); icon.setAttribute('aria-hidden', 'true');
+        button.replaceChildren(icon, node('strong', '', row.agent || 'Unknown agent'),
+          node('small', '', row.session ? short(row.session) : 'No session ID'), node('span', 'request-chip', requestName(row)),
+          badge(item.orphan ? 'unavailable' : row.outcome));
+        if (row.isSubagent || row.subagentId) button.append(node('small', '', 'Subagent'));
+        if (item.unmatched) button.append(node('small', '', `${item.unmatched} unmatched attempt(s)`));
       }
-      if (!row.candidates.length) destinations.append(node('li', 'route-node', `Historical topology / candidates unavailable. Recorded provider: ${row.provider || 'Unknown'} → served model: ${row.servedModel || 'Not recorded'}.`));
-      chain.append(actor, arrow(), gateway, arrow(), destinations); card.append(chain);
-      if (attempts.length) {
-        card.append(node('h3', 'attempt-list-title', 'Actual attempt sequence'), attemptList(row, attempts, true));
-        if (replaying && attempts.length < row.attempts.length) card.append(node('p', 'muted small', 'Later recorded attempts are hidden during replay. This is not live execution.'));
-      } else card.append(node('p', 'muted small', 'No attempt trace is available. Eligible routes are not evidence of a successful request.'));
-      return card;
     });
-    $('route-graph').replaceChildren(...cards);
+    reconcile($('route-destinations'), destinationNodes, scene.destinations, item => {
+      const element = node('li', 'route-destination'), button = node('button', 'destination-button');
+      sceneButton(button, item.requestKey, item.key); element.append(button); return element;
+    }, (element, item) => {
+      element.dataset.testid = item.candidate ? 'graph-candidate' : 'graph-unavailable';
+      element.dataset.requestKey = item.requestKey; element.dataset.candidateKey = item.candidate?.key || '';
+      element.dataset.sceneKey = item.key; element.dataset.state = item.state; element.dataset.active = String(item.active);
+      element.dataset.highlight = String(replayIndex !== null && item.current);
+      const button = element.firstElementChild;
+      button.setAttribute('aria-pressed', String(focusKey === item.requestKey));
+      const signature = JSON.stringify([item.candidate, item.attempts, item.state, item.message, item.row.id]);
+      if (element.dataset.content !== signature) {
+        element.dataset.content = signature;
+        const candidate = item.candidate, last = item.attempts.at(-1);
+        const title = node('span', 'destination-name');
+        title.append(node('strong', '', candidate ? candidate.provider || 'Provider unknown' : 'Route unavailable'),
+          node('small', '', candidate?.label || item.message));
+        const meta = node('span', 'destination-meta');
+        meta.append(node('code', '', candidate?.model || (candidate ? 'Model unknown' : item.row.servedModel || 'Model not recorded')),
+          node('small', '', `${requestName(item.row)} · ${STATES[item.state] || 'Unknown'}${last ? ` · #${attemptIndex(last, item.attempts.length - 1)} ${last.transition || 'unknown'}` : candidate ? ' · not attempted' : ''}`));
+        button.replaceChildren(badge(item.state), title, meta);
+      }
+    });
+    const wires = [];
+    for (const source of scene.sources) if (!source.orphan && (source.row.candidates.length || source.attempts.length)) {
+      const active = scene.destinations.some(destination => destination.requestKey === source.key && destination.active);
+      const last = source.attempts.at(-1);
+      wires.push({ key: JSON.stringify([source.key]), requestKey: source.key,
+        state: last ? last.outcome === 'in-flight' ? 'attempting' : last.outcome : 'candidate', active, kind: 'source' });
+    }
+    for (const destination of scene.destinations) if (destination.candidate) wires.push({ ...destination, kind: 'destination' });
+    reconcile($('route-wires'), wireNodes, wires, () => svg('path'), (path, item) => {
+      path.dataset.testid = 'route-wire'; path.dataset.sceneKey = item.key;
+      path.dataset.requestKey = item.requestKey; path.dataset.kind = item.kind;
+      path.dataset.state = item.state; path.dataset.active = String(item.active);
+    });
+    reconcile($('route-hit-area'), hitNodes, wires, item => {
+      const path = svg('path');
+      path.addEventListener('click', () => focusRequest(item.requestKey));
+      path.addEventListener('pointerenter', () => inspect(item.requestKey, item.kind === 'destination' ? item.key : null));
+      path.addEventListener('pointerleave', () => inspect(focusKey));
+      return path;
+    }, (path, item) => { path.dataset.requestKey = item.requestKey; });
+    inspect(scene.sources.some(source => source.key === inspectionKey) ? inspectionKey : focusKey);
+    renderFocusedEvidence(); scheduleGeometry(); syncMotion();
   }
   function renderTimeline() {
+    if (!$('evidence-details').open) return;
     const requests = [...(view?.requests || [])].sort((a, b) => (Date.parse(b.time) || 0) - (Date.parse(a.time) || 0) || a.key.localeCompare(b.key));
     setText('request-count', `${requests.length} evidence records loaded · ${number(view?.metrics?.requests)} requests in scope coverage`);
     if (!requests.length) {
@@ -515,6 +795,12 @@
         if (row.parentSessionKey) body.append(node('p', 'muted', 'Confirmed same-agent parent relationship. Child traffic is included only when explicitly selected.'));
         if (row.isSubagent || row.subagentId) body.append(node('p', 'muted', `Explicit subagent actor${row.subagentId ? `: ${row.subagentId}` : ''}`));
         if (row.partial || row.reasons?.length) body.append(node('p', 'muted', `Partial evidence. ${(row.reasons || []).map(reasonLabel).join(' · ')}`));
+        body.append(node('h3', '', 'Recorded candidates'));
+        const candidates = node('ul', 'candidate-evidence');
+        for (const candidate of row.candidates) {
+          candidates.append(node('li', '', `${candidate.provider || 'Provider unknown'} / ${candidate.label || 'Anonymous candidate'} → ${candidate.model || 'Model unknown'}${candidate.effort ? ` · Effort: ${candidate.effort}` : ''}`));
+        }
+        body.append(row.candidates.length ? candidates : node('p', 'muted', 'Historical topology / candidates unavailable. No route is inferred.'));
         body.append(node('h3', '', 'Recorded attempts'));
           body.append(row.attempts.length ? attemptList(row) : node('p', 'muted', 'Attempt history unavailable. Usage ledger rows do not reconstruct routing order.'));
         };
@@ -534,25 +820,32 @@
   }
   function resetView(scope) {
     if (currentScope.period !== scope.period) { sessions = []; unknownRequests = 0; }
-    currentScope = scope; view = null; focusKey = null; replayIndex = null; showAllRoutes = false; expanded.clear();
+    currentScope = scope; view = null; focusKey = null; replayIndex = null; inspectionKey = null; expanded.clear();
+    motion = null; stopFlights();
+    $('request-list').replaceChildren(node('p', 'empty', 'Loading this scope. Previous-scope requests have been cleared.'));
+    $('focused-evidence').replaceChildren(); $('focused-evidence').hidden = true;
     storage.write(selection()); $('storage-note').hidden = storage.available;
     renderPicker(); renderMetrics(null); renderRoutes(); renderTimeline();
     renderConnection({ status: 'starting', lastUpdated: null, reason: null });
   }
   function applyState(data) {
     if (view && (data.instanceId !== view.instanceId || data.generation !== view.generation)) {
-      focusKey = null; replayIndex = null; showAllRoutes = false; expanded.clear();
+      focusKey = null; replayIndex = null; inspectionKey = null; expanded.clear();
+      motion = null; stopFlights(); $('focused-evidence').replaceChildren();
       announce('The telemetry instance changed. Previous request focus and replay were cleared; session selection is unchanged.');
     }
     const unchangedRecords = view && data.instanceId === view.instanceId && data.generation === view.generation &&
       scopeEquals(data.scope, view.scope) && JSON.stringify(data.requests) === JSON.stringify(view.requests) &&
       JSON.stringify(data.pagination) === JSON.stringify(view.pagination);
     currentScope = data.scope; view = data; sessions = data.sessions; unknownRequests = data.unknownRequests || 0;
+    lastConnection = { ...lastConnection, ...data.connection };
     for (const key of expanded) if (!data.requests.some(row => row.key === key)) expanded.delete(key);
     preserveFocus(() => {
       renderPicker(); renderMetrics(data);
       if (!unchangedRecords) { renderRoutes(); renderTimeline(); }
+      else renderStageSummary();
     });
+    syncMotion();
   }
   async function request(path, { signal, token }) {
     const abort = new AbortController();
@@ -593,14 +886,32 @@
   });
   $('load-more').addEventListener('click', () => { void controller?.loadMore(); });
   $('clear-focus').addEventListener('click', () => { focusKey = null; replayIndex = null; renderRoutes(); renderTimeline(); });
-  $('show-more-routes').addEventListener('click', () => { showAllRoutes = true; renderRoutes(); });
+  const openEvidence = () => {
+    $('evidence-details').open = true; renderFocusedEvidence(); renderTimeline();
+    $('request-list').focus();
+  };
+  $('show-more-routes').addEventListener('click', openEvidence);
+  document.querySelector('.skip-link').addEventListener('click', event => { event.preventDefault(); openEvidence(); });
+  $('evidence-details').addEventListener('toggle', () => {
+    if ($('evidence-details').open) { renderMetrics(view); renderFocusedEvidence(); renderTimeline(); }
+  });
   $('replay-prev').addEventListener('click', () => { if (replayIndex > 0) { replayIndex--; renderRoutes(); } });
   $('replay-next').addEventListener('click', () => { if (replayIndex !== null) { replayIndex++; renderRoutes(); } });
   $('replay-exit').addEventListener('click', () => { replayIndex = null; renderRoutes(); });
-  const visibility = () => controller?.setVisible(!document.hidden && window.magpie?.visible !== false);
+  const visibility = () => {
+    syncMotion(); controller?.setVisible(!document.hidden && window.magpie?.visible !== false);
+    scheduleGeometry();
+  };
   document.addEventListener('visibilitychange', visibility);
-  addEventListener('pagehide', () => { controller?.stop(); removeVisibility?.(); removeVisibility = null; ready = false; });
-  addEventListener('pageshow', event => { if (event.persisted) void start(); });
+  reducedMotion.addEventListener('change', () => syncMotion());
+  addEventListener('resize', scheduleGeometry);
+  addEventListener('pagehide', () => {
+    pageStopped = true; syncMotion(); stageObserver?.disconnect();
+    controller?.stop(); removeVisibility?.(); removeVisibility = null; ready = false;
+  });
+  addEventListener('pageshow', event => {
+    if (event.persisted) { pageStopped = false; motion = null; observeStage(); void start(); }
+  });
   async function start() {
     if (ready || starting) return;
     starting = true;
@@ -623,5 +934,6 @@
     } finally { starting = false; }
   }
   resetView(currentScope);
+  observeStage();
   void start();
 })();

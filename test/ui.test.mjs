@@ -358,6 +358,195 @@ test('fallback text and status markers meet contrast in both selected themes', (
   }
 });
 
+const candidate = (key = 'seat', changes = {}) => ({ key, provider: 'provider', label: 'Key 1', model: 'model', state: 'candidate', ...changes });
+const attempt = (index = 1, candidateKey = 'seat', changes = {}) => ({ index, candidateKey, outcome: 'in-flight', transition: index === 1 ? 'initial' : 'retry', ...changes });
+const route = (key, changes = {}) => ({ ...row(key), time: '2026-11-06T12:00:00Z', outcome: 'in-flight',
+  candidates: [candidate()], attempts: [attempt()], ...changes });
+const sceneData = (requests, changes = {}) => snapshot(ui.makeScope(), { requests, ...changes });
+
+test('scene retains concurrent request-qualified routes despite identical labels and candidate IDs', () => {
+  const data = sceneData([route('request:a'), route('request:b')]);
+  const before = plain(data), scene = ui.projectScene(data);
+  assert.equal(scene.sources.length, 2); assert.equal(scene.destinations.length, 2);
+  assert.equal(new Set(scene.destinations.map(item => item.key)).size, 2);
+  assert.notEqual(ui.sceneKey('a,b', 'c'), ui.sceneKey('a', 'b,c'));
+  assert.deepEqual(plain(scene.destinations.map(item => item.requestKey)), ['request:a', 'request:b']);
+  for (const item of scene.destinations) assert.equal(item.active, true);
+  assert.deepEqual(plain(data), before, 'projection never mutates the input snapshot');
+});
+
+test('scene consumes only selected evidence, preserves unknown/child actor identity and never uses discovery routes', () => {
+  const scope = ui.makeScope('A', 'live', true);
+  const data = snapshot(scope, { sessions: [{ key: 'B', lastModel: 'not-in-scope' }], requests: [
+    route('parent', { sessionKey: 'A' }), route('child', { sessionKey: 'child', parentSessionKey: 'A', isSubagent: true }),
+  ] });
+  const scene = ui.projectScene(ui.validateSnapshot(data, scope));
+  assert.deepEqual(plain(scene.sources.map(item => item.key)), ['child', 'parent']);
+  assert.equal(scene.sources.find(item => item.key === 'child').row.isSubagent, true);
+  const unknown = ui.projectScene(snapshot(ui.makeScope('unknown'), { requests: [route('no-id', { sessionKey: null, session: null, agent: null })] }));
+  assert.equal(unknown.sources[0].row.agent, null); assert.equal(unknown.sources[0].row.session, null);
+  assert(!JSON.stringify(scene).includes('not-in-scope'));
+});
+
+test('scene caps active lanes/destinations, prioritizes every current match and counts omitted evidence', () => {
+  const requests = Array.from({ length: 8 }, (_, index) => route(`r${index}`, {
+    candidates: Array.from({ length: 20 }, (_, i) => candidate(`c${i}`)), attempts: [attempt(1, 'c19')],
+  }));
+  const scene = ui.projectScene(sceneData(requests));
+  assert.equal(scene.sources.length, 6); assert.equal(scene.destinations.length, 12);
+  assert.equal(scene.active, 8); assert.equal(scene.omittedActive, 2); assert.equal(scene.omittedRequests, 2);
+  assert.equal(scene.omittedDestinations, 148); assert.equal(scene.omittedShownDestinations, 108);
+  assert.equal(scene.destinations.filter(item => item.active).length, 6);
+  assert(scene.destinations.slice(0, 6).every(item => item.candidate.key === 'c19'));
+  const focused = ui.projectScene(sceneData(requests), { focusKey: 'r7' });
+  assert.equal(focused.sources[0].key, 'r7'); assert.equal(focused.omittedActive, 7);
+  assert.equal(focused.destinations[0].candidate.key, 'c19');
+  assert.equal(ui.projectScene(sceneData(requests), { maxRequests: 999, maxDestinations: 999 }).sources.length, 6);
+});
+
+test('candidate order is current match, earlier attempts, then unattempted; state comes from actual attempts', () => {
+  const record = route('r', { candidates: [candidate('never', { state: 'success' }), candidate('previous'), candidate('current')],
+    attempts: [attempt(1, 'previous', { outcome: 'failed' }), attempt(2, 'previous', { outcome: 'failed' }),
+      attempt(3, 'current', { transition: 'fallback' })] });
+  const scene = ui.projectScene(sceneData([record]));
+  assert.deepEqual(plain(scene.destinations.map(item => item.candidate.key)), ['current', 'previous', 'never']);
+  assert.deepEqual(plain(scene.destinations.map(item => item.state)), ['attempting', 'failed', 'candidate']);
+  assert.equal(scene.destinations[1].attempts.length, 2);
+  assert.equal(scene.destinations[0].attempts[0].transition, 'fallback');
+  const revised = ui.projectScene(sceneData([{ ...record, partial: true, updatedAt: '2026-11-06T12:01:00Z' }]));
+  assert.deepEqual(plain(revised.destinations.map(item => item.key)), plain(scene.destinations.map(item => item.key)));
+});
+
+test('idle retains latest per session in All but only one latest route in a selected scope', () => {
+  const records = [route('old-a', { outcome: 'success', time: '2026-11-05T12:00:00Z' }),
+    route('new-a', { outcome: 'success' }), route('b', { outcome: 'failed', sessionKey: 'B' })];
+  const data = sceneData(records);
+  const scene = ui.projectScene(data);
+  assert.equal(scene.mode, 'recent'); assert.equal(scene.active, 0);
+  assert.deepEqual(plain(scene.sources.map(item => item.key)), ['b', 'new-a']);
+  assert(scene.destinations.every(item => !item.active));
+  const selected = ui.projectScene({ ...data, scope: ui.makeScope('A', 'live', true) });
+  assert.equal(selected.sources.length, 1);
+  const focused = ui.projectScene(data, { focusKey: 'old-a' });
+  assert.equal(focused.sources[0].key, 'old-a'); assert.equal(focused.mode, 'focused');
+  assert.equal(ui.projectScene(data, { focusKey: 'expired', replayIndex: 0 }).focusKey, null);
+});
+
+test('recorded replay shows only the attempt prefix, not later success or fallback; scope totals stay unchanged', () => {
+  const data = sceneData([route('r', { candidates: [candidate('a', { state: 'failed' }), candidate('b', { state: 'success' })],
+    outcome: 'success', attempts: [attempt(1, 'a', { outcome: 'failed' }), attempt(2, 'a', { outcome: 'failed' }),
+      attempt(3, 'b', { outcome: 'success', transition: 'fallback' })] })]);
+  const scene = ui.projectScene(data, { focusKey: 'r', replayIndex: 1 });
+  assert.equal(scene.mode, 'replay'); assert.equal(scene.sources[0].attempts.length, 2);
+  assert.deepEqual(plain(scene.destinations.map(item => item.state)), ['failed', 'candidate']);
+  assert(scene.destinations.every(item => !item.active));
+  assert.equal(data.requests[0].attempts.length, 3); assert.equal(data.metrics.requests, 1);
+});
+
+test('zero candidates, historical topology and orphan billing never create an eligible or active destination', () => {
+  const waiting = ui.projectScene(sceneData([route('waiting', { candidates: [], attempts: [] })]));
+  assert.equal(waiting.destinations[0].candidate, null); assert.match(waiting.destinations[0].message, /No candidates/);
+  assert.equal(waiting.destinations[0].state, 'unavailable'); assert.equal(waiting.destinations[0].active, false);
+  const history = ui.projectScene(snapshot(ui.makeScope('A', 'today'), { requests: [route('ledger', { outcome: 'success', candidates: [], attempts: [] })] }));
+  assert.match(history.destinations[0].message, /Historical topology/);
+  const orphan = ui.projectScene(sceneData([route('bill', { reasons: ['handed_on_only'] })]));
+  assert.equal(orphan.sources[0].orphan, true); assert.equal(orphan.active, 0);
+  assert.equal(orphan.destinations[0].candidate, null); assert.match(orphan.destinations[0].message, /Billable evidence only/);
+  assert.equal(ui.projectScene(sceneData([])).sources.length, 0);
+});
+
+test('unmatched attempts stay explicit and cannot light a similarly labelled candidate', () => {
+  const scene = ui.projectScene(sceneData([route('r', { candidates: [candidate('known')], attempts: [attempt(1, null)] })]));
+  assert.equal(scene.unmatched, 1); assert.equal(scene.sources[0].unmatched, 1);
+  assert.equal(scene.destinations[0].state, 'candidate'); assert.equal(scene.destinations[0].active, false);
+  assert.equal(scene.destinations[0].attempts.length, 0);
+});
+
+test('motion starts with a baseline, sends once per new actual active attempt, never on revisions or outcomes', () => {
+  let data = sceneData([route('r')]), motion = ui.advanceMotion(null, data);
+  assert.equal(motion.enabled, true); assert.equal(motion.baseline, true); assert.equal(motion.flights.length, 0);
+  motion = ui.advanceMotion(motion, { ...data, revision: 2 });
+  assert.equal(motion.baseline, false); assert.equal(motion.flights.length, 0);
+  data = sceneData([route('r', { attempts: [attempt(1, 'seat', { outcome: 'failed' }), attempt(2)] })]);
+  motion = ui.advanceMotion(motion, data);
+  assert.equal(motion.flights.length, 1); assert.equal(motion.flights[0].index, 2);
+  const emitted = motion.flights[0].key;
+  motion = ui.advanceMotion(motion, data); assert.equal(motion.flights.length, 0);
+  data = sceneData([route('r', { outcome: 'success', attempts: [attempt(1, 'seat', { outcome: 'failed' }), attempt(2, 'seat', { outcome: 'success' })] })]);
+  motion = ui.advanceMotion(motion, data); assert.equal(motion.flights.length, 0);
+  data = sceneData([data.requests[0], route('other')]);
+  motion = ui.advanceMotion(motion, data);
+  assert.equal(motion.flights.length, 1); assert.notEqual(motion.flights[0].key, emitted);
+  assert.equal(motion.flights[0].destinationKey, ui.sceneKey('other', 'seat'));
+});
+
+test('newly seen completed traffic is static; unmatched late joins and duplicate attempt indices never resend', () => {
+  let motion = ui.advanceMotion(null, sceneData([]));
+  motion = ui.advanceMotion(motion, sceneData([route('done', { outcome: 'success' })]));
+  assert.equal(motion.flights.length, 0);
+  motion = ui.advanceMotion(motion, sceneData([route('unmatched', { attempts: [attempt(1, null)] })]));
+  assert.equal(motion.flights.length, 0);
+  motion = ui.advanceMotion(motion, sceneData([route('unmatched')]));
+  assert.equal(motion.flights.length, 0, 'later candidate matching is not a new send');
+  motion = ui.advanceMotion(motion, sceneData([route('new', { attempts: [attempt(1), attempt(1)] })]));
+  assert.equal(motion.flights.length, 1);
+});
+
+test('all cancellation gates establish a resume baseline even with identical record arrays', () => {
+  const data = sceneData([route('r')]);
+  for (const gate of [{ visible: false }, { reducedMotion: true }, { replaying: true }, { reset: true },
+    ...['stale', 'disconnected', 'paused', 'stopped', 'starting'].map(connectionStatus => ({ connectionStatus }))]) {
+    let motion = ui.advanceMotion(null, data);
+    motion = ui.advanceMotion(motion, data, gate);
+    assert.equal(motion.enabled, false); assert.equal(motion.baseline, true); assert.equal(motion.flights.length, 0);
+    const updated = sceneData([route('r', { attempts: [attempt(1), attempt(2)] })]);
+    motion = ui.advanceMotion(motion, updated);
+    assert.equal(motion.enabled, true); assert.equal(motion.baseline, true); assert.equal(motion.flights.length, 0);
+    motion = ui.advanceMotion(motion, sceneData([route('r', { attempts: [attempt(1), attempt(2), attempt(3)] })]));
+    assert.equal(motion.flights.length, 1);
+  }
+});
+
+test('scope, generation, instance and history changes cannot replay sends; flight count and watermarks are bounded', () => {
+  const data = sceneData([route('r')]);
+  const initial = ui.advanceMotion(null, data);
+  for (const change of [{ generation: 2 }, { instanceId: 'replacement' }, { scope: ui.makeScope('B') },
+    { scope: ui.makeScope('A', 'today') }, { scope: ui.makeScope('A', 'live', true) }]) {
+    const next = ui.advanceMotion(initial, { ...data, ...change });
+    assert.equal(next.baseline, true); assert.equal(next.flights.length, 0);
+    if (change.scope?.period === 'today') assert.equal(next.enabled, false);
+  }
+  const many = sceneData(Array.from({ length: 40 }, (_, i) => route(`new-${i}`)));
+  const next = ui.advanceMotion(initial, many);
+  assert.equal(next.flights.length, 12);
+  assert.equal(ui.advanceMotion(next, many).flights.length, 0, 'bounded-away flights are also consumed');
+  const reappeared = ui.advanceMotion(ui.advanceMotion(next, sceneData([])), many);
+  assert.equal(reappeared.flights.length, 0, 'eviction/reappearance inside a generation is not a send');
+  const full = { ...initial, watermarks: new Map(Array.from({ length: 8192 }, (_, i) => [`seen-${i}`, 1])) };
+  const saturated = ui.advanceMotion(full, many);
+  assert.equal(saturated.saturated, true); assert.equal(saturated.watermarks.size, 0);
+  assert.equal(saturated.enabled, true, 'active paths can still pulse after the identity cap');
+  assert.equal(ui.advanceMotion(saturated, sceneData([route('seen-0')])).flights.length, 0, 'forgotten attempts never replay after saturation');
+});
+
+test('one persistent stage, closed evidence disclosure and intrinsic-width constraints replace request-card diagrams', async () => {
+  const html = await readFile(new URL('ui/index.html', root), 'utf8');
+  const css = await readFile(new URL('ui/style.css', root), 'utf8');
+  const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.equal(ids.filter(id => id === 'route-graph').length, 1);
+  assert.match(html, /<details id="evidence-details" data-testid="evidence-details">/);
+  assert(html.indexOf('id="route-graph"') < html.indexOf('id="metrics"'));
+  assert.match(html, /id="route-sources"/); assert.match(html, /id="route-hub"/); assert.match(html, /id="route-destinations"/);
+  assert.doesNotMatch(html, /路由沒有可選|Smart|quota/i);
+  assert.match(css, /min-inline-size: 0/); assert.match(css, /grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(css, /select\s*\{\s*contain:\s*inline-size layout;\s*white-space:\s*nowrap;/,
+    'native selected-option layout is contained without wrapping or clipping the page');
+  assert.doesNotMatch(css, /(?:body|main)[^{]*\{[^}]*overflow[^:]*:\s*(?:hidden|clip)/);
+  assert.doesNotMatch(appSource, /\$\('route-graph'\)\.replaceChildren/);
+  assert.match(appSource, /new ResizeObserver\(scheduleGeometry\)/);
+});
+
 test('local HTML uses classic local scripts and offers labelled stable test hooks', async () => {
   const launcher = await readFile(new URL('page/index.html', root), 'utf8');
   const hostBridge = launcher.match(/<script src="([^"]*_magpie\/bridge\.js)"/)[1];
