@@ -9,6 +9,11 @@
   const object = x => !!x && typeof x === 'object' && !Array.isArray(x);
   const text = (x, n = 2048) => typeof x === 'string' && x.length <= n;
   const time = x => text(x, 64) && Number.isFinite(Date.parse(x));
+  // Display-only metadata, not a second path/actor inference layer. Missing
+  // projectName must stay missing even when full folder disclosure is enabled.
+  const projectName = x => text(x, 256) && x.trim().length > 0 && x !== '.' && x !== '..' &&
+    /^[\p{L}\p{N}_ .~:+-]+$/u.test(x);
+  const actorId = x => text(x, 128) && /^[A-Za-z0-9_-]+$/.test(x);
   const measurements = (x, keys) => keys.every(k => x[k] == null || (typeof x[k] === 'number' && Number.isFinite(x[k]) && x[k] >= 0));
   function validOptions(options) {
     return object(options) && /^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/.test(options.apiToken) &&
@@ -30,7 +35,10 @@
           (r.provider != null && !text(r.provider, 256)) || !time(r.time) || typeof r.done !== 'boolean' ||
           !measurements(r,['status','ms','tokens','out','ttft','cost']) ||
           (r.evidence != null && (!object(r.evidence) || !Array.isArray(r.evidence.reasons) || r.evidence.reasons.some(k=>!text(k,128)))) ||
-          (r.session != null && !text(r.session)) || !Array.isArray(r.order) || !Array.isArray(r.tries) || !Array.isArray(r.left) ||
+          (r.session != null && !text(r.session)) ||
+          (r.projectName != null && !projectName(r.projectName)) || (r.actorId != null && !actorId(r.actorId)) ||
+          (r.isSubagent != null && typeof r.isSubagent !== 'boolean') ||
+          !Array.isArray(r.order) || !Array.isArray(r.tries) || !Array.isArray(r.left) ||
           r.order.length > 1024 || r.left.length > 1024 || r.tries.length > 1024) throw error('invalid_snapshot');
       ids.add(r.id);
       if (r.tries.some(s => !object(s) || typeof s.done !== 'boolean' || (s.start != null && !time(s.start)) || !measurements(s,['status','ms','ttft','again']))) throw error('invalid_snapshot');

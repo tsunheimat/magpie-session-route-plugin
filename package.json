@@ -1,6 +1,6 @@
 {
   "name": "magpie-session-routing",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Read-only, session-isolated routing observability for Magpie WebUI",
   "type": "module",
   "main": "./index.mjs",
@@ -56,7 +56,8 @@
     },
     "options": {
       "port": 3496,
-      "showFolders": false
+      "showFolders": false,
+      "showProjectNames": true
     }
   },
   "devDependencies": {

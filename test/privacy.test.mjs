@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeTrace, normalizeUsage } from '../lib/privacy.mjs';
+import { normalizeTrace, normalizeUsage, safeDisplayName, safeIdentifier, safeProjectName } from '../lib/privacy.mjs';
 import { calculateMetrics } from '../lib/metrics.mjs';
 import { makeRoute } from './fixtures/trace.mjs';
 
@@ -22,6 +22,37 @@ test('allowlist removes all raw account, body, header, archive and failure text'
   assert.equal(normalizeTrace(raw, { showFolders: true }).folder, '/work/private-project');
   raw.tries[0].status = 500;
   assert.equal(record.attempts[0].status, 429);
+});
+
+test('provider display names allow bounded Unicode punctuation without weakening identifiers', () => {
+  for (const name of ['Gemini CLI', 'Antigravity', 'StepFun', 'Kiro', 'Z.ai', '团队 — 模型 (测试)',
+    'My provider: US/EU + staging!', 'Café & Co. [Fast]', 'Cafe\u0301', 'a'.repeat(256)]) assert.equal(safeDisplayName(name), name);
+  for (const name of [null, {}, '', '   ', 'x'.repeat(257), 'a\nname', 'a\tname', 'a\u007fname', 'a\u0085name',
+    'a\u202ename', 'a\u2066name', 'a\u200fname', 'a\u2028name', 'a\ud800name',
+    'private@example.invalid', 'https://example.invalid/key', 'file:/private/path', 'www.private.invalid', 'private.invalid/key',
+    '//private.invalid', 'private.invalid/', 'private.invalid?token',
+    'Bearer PRIVATE-TOKEN', 'Basic abcdefghi', 'sk-ant-privatecredential', 'api key = private', 'authorization: private',
+    'password=private', 'secret: private', 'token=private', 'ghp_privatecredential', 'github_pat_privatecredential',
+    'glpat-privatecredential', 'xoxb-privatecredential', 'AKIA1234567890123456', 'AIza' + 'a'.repeat(30),
+    'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature', '-----BEGIN PRIVATE KEY-----']) {
+    assert.equal(safeDisplayName(name), null, String(name));
+  }
+  assert.equal(safeIdentifier('My provider (US/EU)'), null);
+});
+
+test('project basenames validate the whole recorded path and never expose roots or parent components', () => {
+  for (const [folder, expected] of [['/private/parent/project', 'project'], ['/private/parent/project///', 'project'],
+    ['C:\\private\\parent\\project\\', 'project'], ['C:/private\\parent/project', 'project'],
+    ['../project', 'project'], ['~/project', 'project'], ['project', 'project'],
+    ['/parent/项目 alpha-1', '项目 alpha-1'], ['\\\\server\\share\\project', 'project'], ['/parent/' + 'p'.repeat(240), 'p'.repeat(240)]]) {
+    assert.equal(safeProjectName(folder), expected, folder);
+  }
+  for (const folder of [null, {}, '', '/', '\\', '///', '.', '..', '~', '/parent/.', '/parent/../', '/parent/~',
+    'C:', 'C:/', 'C:\\', 'C:relative', '\\\\server\\share\\', '//server/share/', '//server',
+    '/private@example.invalid/project', '/sk-ant-privatecredential/project', '/parent/project\n', '/parent/' + 'p'.repeat(249),
+    '/parent/AKIA1234567890123456', '/parent/github_pat_privatecredential']) {
+    assert.equal(safeProjectName(folder), null, String(folder));
+  }
 });
 
 test('A,A,B,A is one request, one retry and two fallback transitions', () => {

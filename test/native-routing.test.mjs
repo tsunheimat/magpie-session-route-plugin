@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createNativeProjector } from '../lib/native-routing.mjs';
 import { createAggregator } from '../lib/aggregator.mjs';
 import { DEFAULT_LIMITS } from '../lib/contracts.mjs';
 import { makeRoute } from './fixtures/trace.mjs';
@@ -10,7 +12,7 @@ const clock = () => Date.parse('2026-11-06T13:00:00.000Z');
 const all = { kind: 'all', sessionKey: null, includeChildren: false, period: 'live' };
 const envelope = (routes, extra = {}) => ({ object: 'trace', pid: 123, serves: 'web', now: later,
   seq: Math.max(0, ...routes.map(row => row.seq)), routes, ids: routes.map(row => row.id), ...extra });
-const seat = (id = 'private@example.invalid', extra = {}) => ({ id, provider: 'openai', name: 'PRIVATE-NAME', who: 'PRIVATE-USER',
+const seat = (id = 'private@example.invalid', extra = {}) => ({ id, provider: 'openai', name: 'sk-ant-PRIVATE-NAME-CREDENTIAL', who: 'PRIVATE-USER',
   kind: 'account', model: 'gpt-model', routing: 'order', ...extra });
 const attempt = (id = 'private@example.invalid', extra = {}) => ({ id, model: 'gpt-model', start: time, done: false, ...extra });
 const row = (id, extra = {}) => makeRoute(id, { provider: 'openai', model: 'gpt-model', group: undefined,
@@ -100,6 +102,93 @@ test('exact recorded session and agent survive without parent folding; folders a
   assert.equal(shown.rule.folder, raw.folder);
 });
 
+test('project names are native-only basenames with separate disclosure switches and no folder backfill', () => {
+  const raw = row(1, { folder: '/PARENT-PATH-CANARY/PROJECT-CANARY', rule: { folder: '/RULE-PARENT/RULE-PROJECT' },
+    nested: [{ group: 'g', rule: { folder: '/NESTED-PARENT/NESTED-PROJECT' } }] });
+  for (const showFolders of [false, true]) for (const showProjectNames of [false, true]) {
+    const aggregator = start([raw, row(2, { session: 'second', folder: 'C:\\OTHER-PARENT\\PROJECT-CANARY\\' }),
+      row(3, { session: 'third', projectName: 'INVENTED', rule: { folder: '/RULE-ONLY/NOT-RECORDED' } })], { showFolders, showProjectNames });
+    const native = aggregator.nativeSnapshot(), projected = find(native, 1), legacy = aggregator.snapshot(all);
+    assert.equal(projected.projectName, showProjectNames ? 'PROJECT-CANARY' : undefined);
+    assert.equal(projected.folder, showFolders ? raw.folder : undefined);
+    assert.equal(projected.rule.folder, showFolders ? raw.rule.folder : undefined);
+    assert.equal(projected.nested[0].rule.folder, showFolders ? raw.nested[0].rule.folder : undefined);
+    assert.equal(projected.rule.projectName, undefined);
+    assert.equal(find(native, 3).projectName, undefined, 'never trust a raw label or rule folder as the recorded project');
+    assert.equal(find(native, 2).projectName, projected.projectName);
+    assert.notEqual(find(native, 2).session, projected.session, 'a basename is never source identity');
+    assert.equal(legacy.requests.some(record => Object.hasOwn(record, 'projectName')), false);
+    if (!showFolders) assert.doesNotMatch(JSON.stringify([native, legacy]), /PARENT-PATH-CANARY|OTHER-PARENT|RULE-PARENT|NESTED-PARENT/);
+    if (!showFolders && !showProjectNames) assert.doesNotMatch(JSON.stringify([native, legacy]), /PROJECT-CANARY|RULE-PROJECT|NESTED-PROJECT/);
+  }
+  const enabled = start([raw]).nativeSnapshot().routes[0];
+  assert.equal(enabled.projectName, 'PROJECT-CANARY');
+  assert.equal(enabled.folder, undefined);
+  for (const folder of ['/', '.', '..', '~', 'C:\\', '/parent/..', '/unsafe@example.invalid/project', '/parent/' + 'x'.repeat(250)]) {
+    const projected = start([row(1, { folder })]).nativeSnapshot().routes[0];
+    assert.equal(projected.projectName, undefined, folder);
+    assert.ok(projected.evidence.reasons.includes('project_name_unavailable'));
+  }
+});
+
+test('native actors reconcile header evidence without changing turn-marker or source identity semantics', () => {
+  const actor = 'PRIVATE-ACTOR@example.invalid';
+  const raws = [row(1, { subagentId: actor }), row(2, { sub: actor }), row(3, { subagentId: actor, sub: actor }),
+    row(4, { sub: actor, agent: 'codex' }), row(5, { sub: actor, session: 'independent', parentSession: 'session-alpha' }),
+    row(6, { sub: 'another-private-actor' }), row(7, { subagentId: actor, sub: 'CONFLICT-CANARY' }),
+    row(8, { kind: 'collab_spawn' }), row(9, { kind: 'thread_spawn' }), row(10, { kind: 'agent_job' }),
+    row(11, { subagent: { asked: 'model-a', to: 'model-b', lead: true } }),
+    row(12, { kind: 'thread_title', parentSession: 'session-alpha' }), row(13, { kind: 'review' }),
+    row(14), row(15, { subagentId: 'x'.repeat(2049), sub: 'valid-but-conflicting' })];
+  const native = start(raws).nativeSnapshot();
+  const id = find(native, 1).actorId;
+  assert.match(id, /^actor_[A-Za-z0-9_-]{22}$/u);
+  for (const n of [1, 2, 3, 4, 5]) assert.equal(find(native, n).actorId, id);
+  for (const n of [1, 3, 7]) assert.equal(find(native, n).subagentId, id);
+  for (const n of [2, 4, 5, 8, 9, 10, 11, 12]) assert.equal(find(native, n).subagentId, undefined);
+  assert.notEqual(find(native, 6).actorId, id);
+  for (const n of [7, 15]) {
+    assert.equal(find(native, n).actorId, undefined);
+    assert.ok(find(native, n).evidence.reasons.includes('actor_identity_conflict'));
+  }
+  for (const n of [8, 9, 10, 11]) assert.equal(find(native, n).actorId, undefined);
+  for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15]) assert.equal(find(native, n).isSubagent, true);
+  for (const n of [12, 13, 14]) assert.equal(find(native, n).isSubagent, false);
+  const displayKey = route => JSON.stringify([route.agent, route.session, route.actorId]);
+  assert.equal(new Set([1, 4, 5].map(n => displayKey(find(native, n)))).size, 3, 'full actor IDs require exact agent/session scoping');
+  assert.equal(find(native, 5).session, 'independent');
+  for (const route of native.routes) {
+    assert.equal(route.parentSession, undefined);
+    assert.equal(route.sub, undefined);
+  }
+  assert.doesNotMatch(JSON.stringify(native), /PRIVATE-ACTOR|another-private-actor|CONFLICT-CANARY/);
+});
+
+test('actor activity follows retained routes and rotates on reset while disclosure options persist', () => {
+  for (const showProjectNames of [false, true]) {
+    const raw = row(1, { sub: 'private-worker', folder: '/private/PROJECT-CANARY' });
+    const aggregator = start([raw, row(2, { sub: 'private-worker' })], { showProjectNames });
+    const original = find(aggregator.nativeSnapshot(), 1);
+    aggregator.applyTrace(envelope([row(1, { ...raw, seq: 3, done: true })], { seq: 3, ids: [1] }));
+    const completed = aggregator.nativeSnapshot();
+    assert.equal(completed.routes.length, 1);
+    assert.equal(completed.routes[0].done, true);
+    assert.equal(completed.routes[0].actorId, original.actorId);
+    const reset = envelope([raw], { pid: 999 });
+    assert.equal(aggregator.applyTrace(reset).resync, true);
+    aggregator.applyTrace(reset, { full: true });
+    const afterReset = aggregator.nativeSnapshot().routes[0];
+    assert.notEqual(afterReset.actorId, original.actorId);
+    assert.equal(afterReset.projectName, showProjectNames ? 'PROJECT-CANARY' : undefined);
+    aggregator.clear();
+    assert.deepEqual(aggregator.nativeSnapshot().routes, []);
+    aggregator.applyTrace(envelope([raw]), { full: true });
+    const fresh = aggregator.nativeSnapshot().routes[0];
+    assert.notEqual(fresh.actorId, afterReset.actorId);
+    assert.equal(fresh.projectName, showProjectNames ? 'PROJECT-CANARY' : undefined);
+  }
+});
+
 test('nested privacy canaries and unknown object keys never enter the native cache', () => {
   const canary = 'PRIVATE-CANARY@example.invalid', nested = { text: canary, token: canary, deep: { secret: canary } };
   const rest = { key: canary, until: later, why: canary, by: canary, error: canary, link: canary, headers: nested };
@@ -132,18 +221,69 @@ test('nested privacy canaries and unknown object keys never enter the native cac
   assert.equal(aggregator.nativeSnapshot().routes[0].order[0].price.output, 2, 'raw references were never cached');
 });
 
-test('only trusted local provider names and icon identifiers are used', () => {
-  const projected = start([row(1, { order: [seat('a', { provider: 'openai', name: 'arbitrary', icon: 'https://private.invalid/icon' }),
-    seat('b', { provider: 'custom-provider', name: 'private name', icon: '../../escape', preset: 'anthropic' }),
-    seat('c', { provider: 'custom-provider', name: 'private name', icon: 'openai' })] })]).nativeSnapshot().routes[0];
-  assert.equal(projected.order[0].provider, 'openai');
-  assert.equal(projected.order[0].name, 'OpenAI');
-  assert.equal(projected.order[0].icon, 'openai');
+test('configured safe provider names are independent of opaque identity and native icon precedence', () => {
+  const projected = start([row(1, { order: [seat('a', { provider: 'openai', name: 'Gemini CLI', icon: 'geminicli-color', preset: 'openai' }),
+    seat('b', { provider: 'custom-provider', name: 'Antigravity', icon: 'antigravity-color' }),
+    seat('c', { provider: 'custom-provider', name: 'Kiro', preset: 'kiro-color' }),
+    seat('d', { provider: 'google', name: 'StepFun', icon: '', preset: 'stepfun-color' }),
+    seat('e', { provider: 'custom-provider', name: '团队 — API (EU)', icon: '../../escape', preset: 'anthropic' }),
+    seat('f', { provider: 'openai', name: 'Custom: API + staging!' })] })]).nativeSnapshot().routes[0];
+  assert.deepEqual(projected.order.map(item => item.name), ['Gemini CLI', 'Antigravity', 'Kiro', 'StepFun', '团队 — API (EU)', 'Custom: API + staging!']);
+  assert.deepEqual(projected.order.map(item => item.icon), ['geminicli-color', 'antigravity-color', 'kiro-color', 'stepfun-color', 'generic', 'generic']);
+  assert.equal(projected.order[0].provider, 'openai', 'existing raw identity handling is unchanged');
   assert.match(projected.order[1].provider, /^provider_/);
-  assert.equal(projected.order[1].name, 'Anthropic');
-  assert.equal(projected.order[1].icon, 'claude-color');
-  assert.equal(projected.order[2].provider, projected.order[1].provider);
-  assert.equal(projected.order[2].icon, 'openai');
+  assert.equal(projected.order[1].provider, projected.order[2].provider, 'names cannot create separate destinations');
+  assert.equal(projected.order[4].preset, 'anthropic');
+  assert.equal(projected.order[0].preset, 'openai');
+  assert.ok(projected.evidence.reasons.includes('provider_icon_unsupported'));
+});
+
+test('every bundled artwork identifier is available through the existing static manifest', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../ui/vendor/magpie/static-manifest.json', import.meta.url), 'utf8'));
+  const icons = manifest.files.filter(path => path.startsWith('vendor/magpie/icons/')).map(path => path.split('/').at(-1).replace(/\.(svg|png)$/u, ''));
+  assert.ok(icons.length > 150);
+  const projector = createNativeProjector();
+  for (const icon of icons) {
+    for (const metadata of [{ icon }, { preset: icon }]) {
+      const projected = projector.route(row(1, { order: [seat('a', { name: 'Configured provider', ...metadata })] }));
+      assert.equal(projected.order[0].icon, icon);
+    }
+  }
+});
+
+test('unsafe or missing provider names use stable neutral labels with explicit evidence', () => {
+  const projector = createNativeProjector();
+  for (const name of [undefined, null, '', 'private@example.invalid', 'https://private.invalid', 'sk-ant-privatecredential',
+    'Bearer privatecredential', 'unsafe‮name', 'unsafe\nname', 'n'.repeat(257)]) {
+    const projected = projector.route(row(1, { order: [seat('a', { provider: 'openai', name, icon: 'openai' }),
+      seat('b', { provider: 'openai', name }), seat('c', { provider: 'google', name })] }));
+    assert.match(projected.order[0].name, /^Provider [A-Za-z0-9_-]{8}$/u);
+    assert.equal(projected.order[0].name, projected.order[1].name);
+    assert.notEqual(projected.order[0].name, projected.order[2].name);
+    assert.ok(projected.evidence.reasons.includes(name == null || name === '' ? 'provider_name_unavailable' : 'provider_name_withheld'));
+    if (name) assert.equal(JSON.stringify(projected).includes(name), false);
+  }
+});
+
+test('unsupported explicit artwork never falls back to another brand or exposes paths', () => {
+  const projector = createNativeProjector();
+  for (const icon of ['file:/private/icon.svg', 'https://private.invalid/icon', '../../escape', '/openai', 'openai.svg',
+    'private@example.invalid', 'not-bundled', {}, false, 1]) {
+    const projected = projector.route(row(1, { order: [seat('a', { name: 'Configured provider', icon, preset: 'geminicli-color' })] }));
+    assert.equal(projected.order[0].icon, 'generic');
+    assert.equal(projected.order[0].preset, 'geminicli-color');
+    assert.ok(projected.evidence.reasons.includes('provider_icon_unsupported'));
+  }
+  for (const preset of ['file:/private/icon.svg', 'https://private.invalid/icon', '../escape', 'private@example.invalid', 'sk-ant-privatecredential']) {
+    const projected = projector.route(row(1, { order: [seat('a', { preset })] }));
+    assert.equal(projected.order[0].preset, undefined);
+    assert.equal(projected.order[0].icon, 'generic');
+    assert.ok(projected.evidence.reasons.includes('provider_preset_unsupported'));
+    assert.equal(JSON.stringify(projected).includes(preset), false);
+  }
+  const projected = projector.route(row(1, { order: [seat('a', { preset: 'safe-custom-preset' })] }));
+  assert.equal(projected.order[0].preset, 'safe-custom-preset');
+  assert.equal(projected.order[0].icon, 'generic');
 });
 
 test('native snapshots are deeply detached, including quota, groups, lift maps, and connection', () => {

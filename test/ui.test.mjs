@@ -56,6 +56,20 @@ test('adapter accepts the actual native projection and rejects malformed envelop
   }
 });
 
+test('optional project and actor fields are bounded display metadata, not paths or guessed identities', () => {
+  const d = snapshot(), withFields = fields => ({ ...d, routes: d.routes.map(r => ({ ...r, ...fields })) });
+  for (const fields of [{}, { projectName: null, actorId: null, isSubagent: null },
+    { projectName: '專案 A-1.2', actorId: 'actor_0123456789abcdefghijkL', isSubagent: true },
+    { projectName: 'a'.repeat(256), isSubagent: false }, { folder: '/opt/private/full/path', isSubagent: true }]) {
+    const value = withFields(fields); assert.equal(ui.validateSnapshot(value), value);
+  }
+  for (const fields of [
+    ...['', '.', '..', ' ', '/parent/project', 'C:\\project', 'private/secret', 'a\u202eb', 'a\u0000b', 'x'.repeat(257), 5, {}].map(projectName => ({ projectName })),
+    ...['', 'actor id', '../actor', 'a\u202eb', '<actor>', 'x'.repeat(129), 5, {}].map(actorId => ({ actorId })),
+    ...['yes', 1, {}, []].map(isSubagent => ({ isSubagent })),
+  ]) assert.throws(() => ui.validateSnapshot(withFields(fields)), /invalid_snapshot/);
+});
+
 test('refreshes coalesce without overlap and canceled late responses cannot repaint', async () => {
   const calls = [];
   const h = harness({ request: options => new Promise(resolve => calls.push({ ...options, resolve })) });

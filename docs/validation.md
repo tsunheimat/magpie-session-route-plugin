@@ -2,6 +2,34 @@
 
 This record distinguishes **implemented**, **automatically tested**, and **deployment-verified** behavior. A loopback/protocol fixture is not a Docker, external HTTPS or production agent-process test. Generated artifacts are excluded from the npm package.
 
+## v0.3.1 project, sub-agent and provider corrections — 2026-11-09
+
+The user reported three v0.3.0 display gaps: project names disappeared under per-session grouping; sub-agent requests had no activity boxes; and the adapter replaced provider names/icons despite copying the renderer. Version **0.3.1** was developed on `fix/native-display-metadata`, based on released `2dbdedf`. It keeps the original destinations/flight engine and session source identity. New tests exercise raw recorded branding through the real projector/service, not only renderer inputs whose metadata was already substituted.
+
+The user explicitly requested commit, merge, push and release after the local results were presented. Distribution is through GitHub source/tag/release, not npm or a cluster deployment. The v0.3.0 results and runtime fingerprint below remain historical and do not certify this version. No deployment or Magpie core change is part of this release.
+
+Implementation now adds independent `showProjectNames:true` / `showFolders:false` disclosure controls, source-local flat actor-request boxes, safe recorded provider display names and all supported pinned icon tokens. Original source keys, four-source admission, `LIVE = 4` startup/resume, request flight endpoints and right-side reconciliation remain unchanged. The deterministic source patch now records **28 replacements**; native CSS is unchanged, and the child-box extension is scoped in plugin-owned CSS.
+
+Runtime fingerprint: **`bb352f3923970b70fb5e73315a37301635a62549d47bb2ed2726e52aaba71512`**, using the same 222-file runtime hashing method documented for v0.3.0 below (with this version's actual file bytes and manifest).
+
+Current verification:
+- Unit/API: **183 passed, 1 explicit browser-only skip, 0 failed** (184 total), Release rerun: `artifacts/release-v0.3.1-wz91GD/unit.log`.
+- Chromium and isolated WebKit protected-service: **19/19 passed in each**, Release reruns: `artifacts/release-v0.3.1-wz91GD/chromium.log` and `webkit.log`. New cases verify single-project visibility/path privacy, raw provider names/artwork (including invalid explicit icon handling), sub-agent concurrency/unknown identity, stable child DOM, collapse/mobile layout, exact native curved return endpoints and removal on eviction/stale data.
+- Original/extraction/session + raw-branding comparisons: **13/13 passed in each engine**, `artifacts/native-routing/display-metadata/{chromium,webkit}-parity-final.log`. Four additional raw provider cases feed unmodified upstream separately from the actual protected service; `{chromium,webkit}-raw-branding-parity.json` records exact name/icon matches for Gemini CLI, Antigravity, Kiro and StepFun with a configured Unicode label. This specifically catches adapter substitutions hidden by comparing sanitized inputs only.
+- Syntax/provenance/package: **46 scripts, 229 package files, below 6 MiB**, deterministic regeneration and whitespace checks passed.
+- Contained actual Magpie/Bun: **14/14 checks passed**, Release rerun `artifacts/integration/run-aQnMaA/result.json`, completion `2026-11-09T07:11:43.169Z`, reference unchanged. The earlier display-correction run `run-m94uE3` also passed. New real-header calls verify safe project basenames, configured provider names and shared tool-less actor identity without paths/raw IDs. Synthetic HOME/work and processes are removed; external egress stays blocked.
+
+Intermediate failures are not counted as passes. The first production-service runs exposed two test mistakes: the branding fixture reused one account ID across different providers (unlike native provider-qualified IDs), and the endpoint assertion assumed six horizontal pixels instead of six **path-length** pixels on the native curve. Corrected tests use proper raw seat identities and sample the actual source SVG path; they retain exact session/source checks and a 1px geometry tolerance. No runtime/flight algorithm changed to accommodate them. One WebKit comparison's fixed 100ms wait was replaced by waiting for the asserted activity state. A WebKit service run overlapped another WebKit suite and encountered a screenshot-stability timeout; that log alone does not establish the cause. Subsequent final suites are run sequentially to avoid the known headless presentation contention, without retrying assertions or loosening CSP.
+
+Screenshots inspected include actual protected-service desktop project/sub-agent boxes and WebKit mobile dark, plus original native comparison fixtures. Logs/screenshots for this work are local under `artifacts/native-routing/display-metadata/` and `artifacts/browser/native-service/`; they are not packaged. All final browser/comparison runs above passed. Selected screenshots:
+- [Project names and sub-agent activity, actual service](../artifacts/browser/native-service/chromium-project-subagents-upper.png)
+- [WebKit mobile dark, actual service](../artifacts/browser/native-service/webkit-project-subagents-mobile-dark-upper.png)
+- [Original Gemini CLI branding](../artifacts/native-routing/display-metadata/chromium-brand-gemini-original.png)
+- [Gemini CLI through the protected plugin](../artifacts/native-routing/display-metadata/chromium-brand-gemini-protected.png)
+- [Antigravity through protected WebKit](../artifacts/native-routing/display-metadata/webkit-brand-antigravity-protected.png)
+
+The new project-name default applies to missing options on existing installations without rewriting them; opt out with `showProjectNames:false`. Child boxes retain every relevant observed actor, with a scrollable/collapsible area and explicit outside-view count. The new activity messages include zh-TW translations; other locales use English fallback. Account/key/group aliases, arbitrary uploaded artwork, unavailable inventory and full worker ancestry remain outside the corrected provider/project display contract.
+
 ## v0.3.0 native upper-block copy — 2026-11-09
 
 The requested behavior is the actual native upper Routing block with client-source grouping by exact agent + recorded session. Version 0.2.0's custom renderer, session selector and per-request source nodes did not meet that requirement even though its automated tests passed. Version **0.3.0**, developed on `feat/native-session-clients`, uses the actual pinned source/CSS/artwork, deterministic extraction and a separate **25-replacement source-grouping patch**. The user explicitly requested merge and release after the comparison screenshots and known differences were presented; this does not erase the measured differences or establish pixel-identical parity.

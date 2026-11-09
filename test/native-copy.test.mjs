@@ -6,8 +6,9 @@ import vm from 'node:vm';
 import http from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { createNativeProjector, nativeSnapshot } from '../lib/native-routing.mjs';
+import { browserHarness, nativeTrace } from './browser/harness.mjs';
 import { fileURLToPath } from 'node:url';
-import { generate, extract, sessionPatch, freeNames, REVISION } from '../scripts/vendor-native-routing.mjs';
+import { generate, extract, sessionPatch, freeNames, REVISION, SOURCE_ACTIVITY } from '../scripts/vendor-native-routing.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const vendor = path.join(root, 'ui/vendor/magpie');
 const read = p => fs.readFileSync(path.join(vendor, p),'utf8');
@@ -30,7 +31,9 @@ test('pristine native snapshot, generated files, CSS and MIT notice reproduce ex
     assert.deepEqual(clients.find(c=>c.id===id),{id,name,icon});
   }
   assert.ok(baseline.includes(sourceLines(295,312)), 'native responsive width observer unchanged');
-  assert.equal(result.sourceChanges,25);
+  assert.equal(result.sourceChanges,28);
+  assert.equal(JSON.parse(read('source-grouping-patch.json')).length,28);
+  assert.ok(patched.includes('const ags = [...new Set(out.map(sourceKey))].slice(-4);'), 'native four-source admission retained');
   assert.ok(patched.includes(sourceLines(5202,5203)), 'native LIVE=4 startup/resume request scheduling unchanged');
 });
 test('source patch leaves actual destination reconciliation and flight geometry intact', () => {
@@ -53,6 +56,56 @@ test('known sources use exact agent/recorded session; unknown sources use stable
   assert.notEqual(key(r),key({...r,agent:'codex'}));
   assert.notEqual(key({...r,session:''}),key({...r,id:2,session:''}));
   assert.equal(key({...r,session:''}),key({...r,session:'',model:'changed'}));
+});
+// Test the exact generated pure grouping functions, not a replacement renderer.
+const activity = vm.runInNewContext(`(() => {
+  const host = { generation: () => 4 }, at = Date.parse, LINGER = 12000;
+  ${patched.match(/const sourceKey = \(r\) =>[\s\S]*?;\n/)[0]}
+  ${SOURCE_ACTIVITY}
+  return { sourceKey, sourceRequests, actorGroups, actorLabels };
+})()`);
+test('activity groups every retained source-local request, without using turns, parents or a flight limit', () => {
+  const r = { id: 1, time: '2026-11-09T00:00:00Z', agent: 'claude', session: 'same', done: false, actorId: 'actor_abcdefgA', isSubagent: true };
+  const clock = Date.parse(r.time) + 20000;
+  const rs = [r, { ...r, id: 2 }, { ...r, id: 3, done: true, ms: 15000 },
+    { ...r, id: 4, actorId: 'actor_abcdefgB', done: true, ms: 19000 },
+    { ...r, id: 5, actorId: undefined }, { ...r, id: 6, actorId: undefined },
+    { ...r, id: 7, actorId: undefined, isSubagent: false, subagentId: 'native-turn-only' },
+    { ...r, id: 8, done: true }, { ...r, id: 9, agent: 'codex' },
+    { ...r, id: 10, session: 'child', parentSession: 'same' }];
+  const relevant = activity.sourceRequests(activity.sourceKey(r), [], new Map(rs.map(x => [x.id, x])), clock);
+  assert.deepEqual([...relevant].map(x => x.id), [1, 2, 3, 4, 5, 6, 7]);
+  const groups = activity.actorGroups(relevant);
+  assert.equal(groups.size, 3);
+  assert.deepEqual({ ...groups.get(r.actorId) }, { id: r.actorId, active: 2, ended: 1 });
+  assert.deepEqual({ ...groups.get('actor_abcdefgB') }, { id: 'actor_abcdefgB', active: 0, ended: 1 });
+  assert.deepEqual({ ...groups.get(null) }, { id: null, active: 2, ended: 0 });
+  const selected = activity.sourceRequests(activity.sourceKey(r), [rs[7]], new Map(rs.map(x => [x.id, x])), clock);
+  assert.equal(selected.some(x => x.id === 8), true, 'selected old request remains explicit recent/ended activity');
+  assert.equal(activity.actorGroups(Array.from({ length: 60 }, (_, i) => ({ ...r, actorId: `actor_${i}` }))).size, 60);
+  assert.equal(activity.actorGroups([]).size, 0);
+});
+test('short safe actor labels extend colliding prefixes without merging opaque identities', () => {
+  const ids = ['actor_123456789012345A', 'actor_123456789012345B', 'actor_other0123456789', 'actor_other0123456789X'];
+  const labels = activity.actorLabels([...ids, null]);
+  assert.equal(labels.size, ids.length);
+  assert.equal(new Set(labels.values()).size, ids.length);
+  for (const id of ids) assert.ok(id.startsWith(labels.get(id).replace(/…$/, '')));
+  assert.equal(labels.get(ids[0]), ids[0]);
+  assert.equal(labels.get(ids[1]), ids[1]);
+});
+test('project summaries use explicitly disclosed same-session basenames even for one project', () => {
+  assert.match(patched, /const projects = \[\.\.\.new Set\(relevant\.map\(\(x\) => x\.projectName\)\.filter\(Boolean\)\)\]/);
+  const line = patched.match(/setText\(a\.sub, projects\.length[^\n]+/)[0];
+  const subtitle = vm.runInNewContext(`(projects, r) => {
+    const a = { sub: {} }, lastLevel = f => f.split('/').pop(), sourceLabel = r => r.session;
+    const setText = (el, text) => el.textContent = text;
+    ${line}
+    return a.sub.textContent;
+  }`);
+  assert.equal(subtitle(['專案'], { session: 'session-a', model: 'requested' }), '專案 · session-a');
+  assert.equal(subtitle(['one', 'two'], { session: 'session-a', model: 'requested' }), 'one, two · session-a');
+  assert.equal(subtitle([], { session: 'session-a', model: 'requested', folder: '/secret/no-inference' }), 'session-a · requested');
 });
 test('renderer has no core fetch/write/body/provider/history execution paths or unresolved application globals', () => {
   assert.doesNotMatch(patched, /\bfetch\s*\(|\bapi\s*\(|function (loadBodies|renderBodies|loadGroups|groupAction|renderHist|renderActs|renderCtx|loadDays|poll)\b/);
@@ -306,6 +359,83 @@ test('extraction/session fixture and optional original reference: parity, flight
         await page.waitForFunction(()=>document.querySelectorAll('.rt-sky .pkt').length===4,{},{timeout:5000});
         assert.equal(await page.locator('.rt-sky .pkt').count(),4);
 
+        // Approved source-only extensions use the real copied DOM and flight
+        // scheduler. These fixtures do not exercise provider projection or add
+        // a different animation endpoint for child activity.
+        await page.reload();
+        await page.addStyleTag({path:path.join(root,'ui/style.css')});
+        const actors=fixture([...Array(20).fill('project-session-a'),'project-session-b','independent-child']);
+        const actorA='actor_123456789012345A', actorB='actor_123456789012345B';
+        for(const [i,r] of actors.routes.entries()) {
+          r.projectName='Shared project'; r.folder='/private/disclosed/Shared project'; r.isSubagent=true;
+          if(i<18)r.actorId=i<2?actorA:i===2?actorB:`actor_distinct_${i}`;
+          if(i>=20)r.actorId=actorA;
+        }
+        actors.routes[3].projectName='Other project';
+        actors.routes[21].parentSession='project-session-a';
+        await page.evaluate(d=>testNative.accept(d),actors);
+        await page.waitForFunction(()=>document.querySelectorAll('.rt-actor').length===20);
+        const srcA=page.locator('.rt-src').filter({has:page.locator(':scope > small', {hasText:'Other project'})});
+        assert.equal(await page.locator('.rt-src').count(),3);
+        assert.equal(await page.locator('.rt-src .rt-src').count(),0);
+        assert.equal(await page.locator('.rt-sky .pkt').count(),4);
+        assert.equal(await srcA.locator('.rt-actor').count(),18);
+        assert.match(await srcA.locator(':scope > small').innerText(),/^Shared project, Other project · project-sess/);
+        assert.match(await srcA.getAttribute('title'),/example-model\nSession id: project-session-a/);
+        assert.equal(await page.locator('.rt-src').filter({hasText:'independent'}).count(),1,'parentSession never reparents');
+        const sameActor=srcA.locator(`.rt-actor[data-actor-id="${actorA}"]`);
+        assert.match(await sameActor.innerText(),/Active gateway requests: 2/);
+        assert.notEqual(await sameActor.locator('.rt-actor-label').innerText(),await srcA.locator(`.rt-actor[data-actor-id="${actorB}"] .rt-actor-label`).innerText());
+        const unknown=srcA.locator('.rt-actor[data-actor-id=""]');
+        assert.match(await unknown.innerText(),/actor unavailable\nActive gateway requests: 2/);
+        assert.equal(await srcA.locator('summary').getAttribute('aria-label'),'Sub-agent activity: 17 identified actors; 2 requests with actor unavailable; 20 active gateway requests');
+        assert.match(await srcA.locator('.rt-activity-overflow').innerText(),/outside view; scroll/);
+        if(shots)await page.screenshot({path:path.join(shots,name+'-source-activity.png')});
+        await srcA.locator('.rt-actors').focus();
+        await page.keyboard.press('End');
+        await page.waitForFunction(()=>document.activeElement?.classList.contains('rt-actors')&&document.activeElement.scrollTop>0);
+        await srcA.locator('summary').focus(); await page.keyboard.press('Enter');
+        assert.equal(await srcA.locator('.rt-activity').evaluate(n=>n.open),false);
+        await page.keyboard.press('Enter');
+        await page.evaluate(()=>window.savedActivity=[...document.querySelectorAll('.rt-actor')]);
+        actors.revision++; actors.seq++;
+        await page.evaluate(d=>testNative.accept(d),actors); await page.waitForTimeout(100);
+        assert.equal(await page.evaluate(()=>savedActivity.every((n,i)=>n===document.querySelectorAll('.rt-actor')[i])),true);
+        assert.equal(await page.locator('.rt-sky .pkt').count(),4,'unchanged snapshot adds no flights');
+
+        // Completed gateway requests remain explicitly ended, not "worker done";
+        // playback cannot turn their activity boxes back into live requests.
+        for(const r of actors.routes) {r.done=true;r.status=200;r.ms=700;for(const tr of r.tries){tr.done=true;tr.status=200;tr.ms=700;}}
+        actors.revision++; actors.seq++;
+        await page.evaluate(d=>testNative.accept(d),actors);
+        await page.waitForFunction(()=>!document.querySelector('.rt-actor.active'));
+        assert.equal(await page.locator('.rt-actor.active').count(),0);
+        assert.match(await sameActor.innerText(),/Active gateway requests: 0 · Gateway requests ended: 2/);
+        await page.getByRole('button',{name:'Replay',exact:true}).click(); await page.waitForTimeout(100);
+        assert.equal(await page.locator('.rt-actor.active').count(),0);
+        await page.getByRole('button',{name:'Stop replay',exact:true}).click();
+        actors.routes=actors.routes.filter(r=>r.id!==1&&r.id!==2); actors.ids=actors.routes.map(r=>r.id); actors.revision++; actors.seq++;
+        await page.evaluate(d=>testNative.accept(d),actors); await page.waitForTimeout(100);
+        assert.equal(await srcA.locator(`.rt-actor[data-actor-id="${actorA}"]`).count(),0,'eviction removes actor state within a retained source');
+        await page.evaluate(()=>testNative.locale('zh-TW')); await page.waitForTimeout(100);
+        assert.match(await srcA.locator('summary').innerText(),/子代理活動/);
+        await page.setViewportSize({width:390,height:844});await page.waitForTimeout(100);
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+        if(shots)await page.screenshot({path:path.join(shots,name+'-source-activity-mobile-zh-TW.png')});
+        await page.evaluate(d=>testNative.accept({...d,revision:d.revision+1,connection:{status:'stale'}}),actors);
+        assert.equal(await page.locator('.rt-activity').count(),0);
+        const reset=fixture(['same-basename-a','same-basename-b']);reset.generation=2;
+        reset.routes[0].projectName='Only project';reset.routes[1].folder='/not-a-project-disclosure';
+        await page.evaluate(d=>testNative.accept(d),reset);await page.waitForTimeout(100);
+        assert.equal(await page.locator('.rt-src').count(),2);
+        assert.equal(await page.locator('.rt-activity').count(),0,'generation reset clears child state');
+        assert.match(await page.locator('.rt-src > small').first().innerText(),/^Only project ·/);
+        assert.doesNotMatch(await page.locator('.rt-src > small').nth(1).innerText(),/not-a-project-disclosure/);
+        await page.evaluate(()=>testNative.clear('Revoked'));
+        assert.equal(await page.locator('.rt-activity').count(),0);
+        await page.evaluate(()=>testNative.locale('en'));
+        await page.setViewportSize({width:1200,height:850});
+
         if(process.env.NATIVE_REFERENCE==='1') {
           await page.evaluate(()=>localStorage.removeItem('magpie.maskEmails'));
           await page.close();
@@ -389,6 +519,50 @@ test('extraction/session fixture and optional original reference: parity, flight
             report.variants.push(variant);
           }
           if(shots)fs.writeFileSync(path.join(shots,name+'-parity-matrix.json'),JSON.stringify(report,null,2)+'\n');
+
+          // Crucially, feed ORIGINAL raw branding to upstream and the same raw
+          // trace through the actual protected plugin service. Comparing two
+          // already-anonymized DTOs would not catch v0.3.0's brand substitution.
+          const brands = [
+            ['gemini', 'Gemini CLI', 'geminicli-color'],
+            ['antigravity', 'Antigravity', 'antigravity-color'],
+            ['kiro', 'Kiro', 'kiro-color'],
+            ['stepfun', 'StepFun 研發 (EU)', 'stepfun-color'],
+          ], branding = [];
+          for (const [provider, displayName, artwork] of brands) {
+            const raw = nativeTrace({ sessions: ['brand-session'], done: true });
+            const r = raw.routes[0]; r.provider = provider;
+            r.order = [{ ...r.order[0], id: `${provider}@synthetic-seat`, provider, kind: 'provider', name: displayName, icon: artwork }];
+            r.tries[0].id = r.order[0].id;
+            const evidence = { provider, expectedName: displayName, expectedIcon: artwork };
+            const nativeContext = await browser.newContext({ viewport: { width: 1200, height: 900 }, reducedMotion: 'reduce' });
+            try {
+              const p = await nativeContext.newPage(); p.setDefaultTimeout(10000);
+              await originalReference(p, raw);
+              evidence.original = await p.locator('.rt-accts > li > b').evaluateAll(nodes => nodes.map(n => ({
+                name: n.querySelector('.who')?.textContent, icon: n.querySelector('.ic')?.dataset.icon,
+              })));
+              if (shots) await p.locator('#rt').screenshot({ path: path.join(shots, `${name}-brand-${provider}-original.png`) });
+            } finally { await nativeContext.close(); }
+            const protectedHost = await browserHarness({ fixture: raw });
+            const protectedContext = await browser.newContext({ viewport: { width: 1200, height: 900 }, reducedMotion: 'reduce' });
+            try {
+              await protectedContext.route('**/*', route => {
+                assert.equal(new URL(route.request().url()).origin, protectedHost.url, 'protected branding fixture is loopback-only');
+                return route.continue();
+              });
+              const p = await protectedContext.newPage(); p.setDefaultTimeout(10000); await p.goto(protectedHost.url);
+              const frame = p.frameLocator('iframe'); await frame.locator('.rt-accts > li > b').first().waitFor();
+              evidence.protected = await frame.locator('.rt-accts > li > b').evaluateAll(nodes => nodes.map(n => ({
+                name: n.querySelector('.who')?.textContent, icon: n.querySelector('.ic')?.dataset.icon,
+              })));
+              assert.deepEqual(evidence.original, [{ name: displayName, icon: artwork }]);
+              assert.deepEqual(evidence.protected, evidence.original, 'raw original and real projection preserve exactly the same public branding');
+              if (shots) await frame.locator('#rt').screenshot({ path: path.join(shots, `${name}-brand-${provider}-protected.png`) });
+            } finally { await protectedContext.close(); await protectedHost.close(); }
+            branding.push(evidence);
+          }
+          if (shots) fs.writeFileSync(path.join(shots, name+'-raw-branding-parity.json'), JSON.stringify(branding,null,2)+'\n');
         }
         assert.deepEqual(errors,[]);
       } finally {await browser.close();}
