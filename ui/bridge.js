@@ -32,7 +32,7 @@
       root.dataset.theme = theme.dark ? 'dark' : 'light';
       root.style.colorScheme = theme.dark ? 'dark' : 'light';
     }
-    // All UI copy is English; do not falsely label it with the parent's locale.
+    // The native renderer applies locale separately through its copied i18n.
     for (const [name, value] of Object.entries(theme.tokens || {})) {
       if (tokenNames.has(name) && typeof value === 'string' && value.length < 256) {
         root.style.setProperty(`--magpie-${name}`, value);

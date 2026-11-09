@@ -20,11 +20,16 @@ assert.equal(manifest.magpie.options.installationId, undefined, 'Installation id
 const required = [
   'index.mjs', 'lib/contracts.mjs', 'lib/config.mjs', 'lib/lifecycle.mjs',
   'lib/server.mjs', 'lib/gateway.mjs', 'lib/collector.mjs', 'lib/privacy.mjs',
-  'lib/aggregator.mjs', 'lib/metrics.mjs', 'lib/history.mjs',
+  'lib/aggregator.mjs', 'lib/metrics.mjs', 'lib/history.mjs', 'lib/native-routing.mjs',
   'page/index.html', 'page/boot.js', 'page/icon.svg',
   'ui/index.html', 'ui/app.js', 'ui/bridge.js', 'ui/style.css',
-  'README.md', 'docs/compatibility.md', 'docs/validation.md',
+  'README.md', 'docs/compatibility.md', 'docs/validation.md', 'docs/native-copy-provenance.md',
+  ...JSON.parse(readFileSync(path.join(root, 'ui/vendor/magpie/static-manifest.json'), 'utf8')).files.map(file => `ui/${file}`),
+  ...['static-manifest.json', 'source-manifest.json', 'extraction-manifest.json', 'source-grouping-patch.json']
+    .map(file => `ui/vendor/magpie/${file}`),
 ];
+const generated = spawnSync(process.execPath, [path.join(root, 'scripts/vendor-native-routing.mjs'), '--check'], { encoding: 'utf8' });
+assert.equal(generated.status, 0, `Native extraction is not deterministic\n${generated.stdout}\n${generated.stderr}`);
 for (const file of required) assert.ok(existsSync(path.join(root, file)), `Missing package file: ${file}`);
 function walk(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(e => {
@@ -35,7 +40,13 @@ function walk(dir) {
 }
 const scripts = walk(root).filter(f => /\.(?:mjs|cjs|js)$/.test(f));
 for (const file of scripts) {
-  const checked = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
+  // This exact generator input is a function-body include (it returns the
+  // native host API), not a standalone script. Parse it in its real context;
+  // generated client.js is also checked independently and compared above.
+  const fragment = file === path.join(root, 'ui/native-lifecycle.inc.js');
+  const checked = spawnSync(process.execPath, fragment ? ['--check', '--input-type=commonjs'] : ['--check', file], {
+    encoding: 'utf8', ...(fragment ? { input: `(function () {\n${readFileSync(file, 'utf8')}\n});\n` } : {}),
+  });
   assert.equal(checked.status, 0, `Syntax error in ${path.relative(root, file)}\n${checked.stderr}`);
 }
 for (const html of ['page/index.html', 'ui/index.html']) {
@@ -55,9 +66,10 @@ assert.equal(packed.status, 0, packed.stderr);
 const [pack] = JSON.parse(packed.stdout);
 const paths = new Set(pack.files.map(f => f.path));
 for (const file of ['package.json', ...required]) assert.ok(paths.has(file), `npm pack omits ${file}`);
+const allowed = new Set(['package.json', ...required]);
 for (const file of paths) {
-  assert.ok(/^(?:package\.json|index\.mjs|README\.md|LICENSE(?:\.\w+)?|(?:lib|ui|page)\/.+|docs\/(?:compatibility|validation)\.md)$/.test(file), `Unexpected packaged file: ${file}`);
+  assert.ok(allowed.has(file), `Unexpected packaged file: ${file}`);
   assert.ok(!/(?:^|\/)(?:node_modules|test|artifacts|\.git|\.env(?:\.[^/]+)?)(?:\/|$)|\.(?:log|tgz|pem|key)$/.test(file), `Development or credential file in package: ${file}`);
 }
-assert.ok(pack.unpackedSize < 2 * 1024 * 1024, 'Unexpectedly large package; inspect packed assets.');
+assert.ok(pack.unpackedSize < 6 * 1024 * 1024, 'Unexpectedly large package; inspect pinned native assets.');
 console.log(`Checked ${scripts.length} JavaScript files; npm pack includes ${paths.size} files (${pack.unpackedSize} bytes).`);

@@ -1,6 +1,8 @@
 # Session Routing for Magpie
 
-A read-only plugin page that isolates Magpie routing evidence by the exact **agent + recorded native session ID**. Select a session to scope its routes, concurrent requests, ordered attempts, replay, metrics and usage history together. The original **Routing** page and **Routing Groups** editor are not replaced.
+A read-only plugin page that copies Magpie's **native upper Routing block**, changing client/source grouping to the exact **agent + recorded native session ID**. Different sessions of the same client have separate source nodes; concurrent requests in one session share one source and keep independent native flights. Right-hand account/provider/model rows remain shared. The original **Routing** page and **Routing Groups** editor are not replaced.
+
+**v0.3.0 — actual native upper-block copy:** this version replaces the custom v0.2.0 renderer with the copied native source. Existing `v0.1.0` and `v0.2.0` tags remain unchanged. Chromium/WebKit, source comparisons and contained Magpie/Bun checks pass. The session subtitle causes a small native desktop reflow; this is not a pixel-identical copy beyond the source label. See [validation](docs/validation.md) for measured differences and exact results rather than treating earlier release tests as proof of this version.
 
 The service runs **inside Magpie’s existing Bun plugin host**, listening only on `127.0.0.1`. No extra daemon/container, model calls, routing middleware or persistent traffic archive is added. The browser reaches it through Magpie’s authenticated plugin-page service proxy—not the browser’s localhost.
 
@@ -12,10 +14,12 @@ The package is named `magpie-session-routing` and is distributed through GitHub;
 
 ## Install in an existing Magpie installation
 
+The commands in this section select **v0.3.0**, the native-copy version. Use the local-directory method below to test a local checkout.
+
 Run under the same account and configuration environment as Magpie:
 
 ```sh
-magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.2.0
+magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.0
 magpie plugin list
 ```
 
@@ -25,16 +29,16 @@ Run the CLI inside the **existing Magpie container**, not on the Kubernetes host
 
 ```sh
 kubectl exec -n <namespace> <magpie-pod> -c <magpie-container> -- \
-  magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.2.0
+  magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.0
 ```
 
 The official image keeps configuration and installed plugins under `/config`; persist that mount with your existing PVC. Leave the container's HOME/XDG environment unchanged. No extra pod, Service, Ingress rule, or exposed plugin port is needed. Refresh the WebUI after installation; a pod restart should normally be unnecessary. Then complete secure first-use setup below. This is a single-instance plugin, not a cross-replica collector.
 
-### Upgrade from v0.1.0
+### Upgrade from v0.1.0 or v0.2.0
 
-Run the same `magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.2.0` command inside the existing Magpie container. Both versions use the package name `magpie-session-routing`, so Magpie replaces the existing entry and preserves its options and enabled/disabled state. **Do not remove the old entry first**—removal deletes its saved options. Close/reopen Session Routing after the upgrade; previously configured secure access is reused.
+Run the same `magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.0` command inside the existing Magpie container. These versions use the same package name `magpie-session-routing`, so Magpie replaces the existing entry and preserves its options and enabled/disabled state. **Do not remove the old entry first**—removal deletes its saved options. Close/reopen Session Routing after the upgrade; previously configured secure access is reused.
 
-`magpie plugin update` alone reinstalls a Git plugin's existing pinned spec; it does not change `#v0.1.0` to the new tag. If you previously installed from a local directory or have multiple entries, inspect `magpie plugin list` and use the appropriate installation path rather than creating another enabled instance.
+`magpie plugin update` alone reinstalls a Git plugin's existing pinned spec; it does not change `#v0.1.0` or `#v0.2.0` to the new tag. If you previously installed from a local directory or have multiple entries, inspect `magpie plugin list` and use the appropriate installation path rather than creating another enabled instance.
 
 ### Local directory or archive
 
@@ -76,33 +80,34 @@ Set options in Magpie’s plugin settings; preserve the saved credential pair wh
 | Option | Default | Meaning |
 |---|---|---|
 | `port` | `3496` | IPv4 loopback service port, 1–65535, distinct from the gateway port. Not a browser URL. |
-| `showFolders` | `false` | Explicitly allow project-folder metadata in responses/search. This can expose local paths. |
+| `showFolders` | `false` | Explicitly allow project-folder metadata in responses/native source summaries. This can expose local paths. |
 | `installationId` | Unset | Generated per installation by first-use setup. Do not reuse across separate installs. |
 | `apiToken` | Unset | Generated 32-byte base64url bearer credential. Keep private. |
 
 A CLI host can receive a temporary service port from Magpie. It must not become a second collector. Overlapping regular hosts perform an authenticated ownership check and wait for the existing owner to release the port; old Magpie hosts can drain for ten minutes. An unrecognized owner permits only a short, bounded exclusive-bind retry so a revoked old host can close during credential rotation; it is never trusted as a compatible owner. Unknown port owners are not killed, probed with a bearer token, or silently replaced by another port. Configure an unused port if the conflict remains.
 
-## Using the page
+## Using the native-copy page
 
-**New in v0.2.0:** one native-style routing stage replaces the original card-based interface, with the session picker above it and Details closed initially. The original `v0.1.0` tag remains unchanged.
+This is the actual copied native upper block, not a newly drawn equivalent. There is **no new session dropdown, per-request source card, custom Details drawer or six-request/twelve-destination limit**.
 
-- **Session picker:** All sessions is global coverage; a particular session uses an exact, case-sensitive `(agent, session)` identity. Equal IDs from different agents do not collide. **Unknown / no session ID** is explicitly unassigned traffic, never a fabricated native session.
-- **Search / Active:** search available agent, title, shortened ID or opt-in folder metadata. Active sessions sort first, then recent activity. A missing reliable title is not guessed. Active means an unfinished **gateway request**, not the agent’s whole task.
-- **Scope:** direct traffic is the default. Include child/subagent traffic only to add confirmed same-agent children and explicit subagent actors. A child with a proven independent native session can be inspected on its own; workers sharing a parent's header are not direct parent traffic. Unconfirmed relationships do not silently join scopes. Picker discovery counts for other sessions are labelled all-actor; the selected session's hint and totals follow the selected scope.
-- **Coverage:** Live uses the bounded trace. Today/7 days/30 days use bounded usage-ledger scans on **gateway-local calendar days**, not browser-local rolling windows. History discovery is period-specific.
-- **Routing stage:** one shared diagram connects request/agent nodes through the Magpie hub to compact provider/key/model rows. Each destination is labelled with its request; identical “Key 1” labels from different requests do not establish a shared account. Concurrent requests remain independent. The default stage prioritizes active traffic, or retains recent static evidence when idle. It is bounded to six request lanes and twelve destination rows, with omitted records, active requests and destinations disclosed. **View all records** opens Details rather than creating an unbounded graph. On mobile, agent nodes and the hub sit above the destinations.
-- **Live movement:** curved paths and local bird/packet markers reflect recorded attempts, not predicted routing. Only newly observed, matched in-flight attempts launch a flight; repeated polls do not fabricate new requests. Candidate-only paths and completed requests remain static. Hidden/stale/disconnected/history/replay/reduced-motion states stop live animation. Hover or keyboard focus reveals concise path information; click a source or destination to focus its request.
-- **Details / timeline / replay:** Details is closed initially and contains full metrics, coverage period controls, the request timeline, and recorded-step replay. Expand a request for measurements; **Focus route** and **Replay attempts** change only presentation, never selected scope or totals. Replay does not reissue requests. History without retained attempt evidence shows topology unavailable; unmatched billable-attempt evidence contributes usage, not extra requests. Account inventory, routing mode and quota data are not inferred from candidate counts.
-- **Refresh:** live cached snapshots poll sequentially roughly once per second without overlapping calls. Hidden frames/tabs pause. Reconnect uses bounded backoff. History is an immutable snapshot; a lightweight live-discovery heartbeat checks connection/access without rescanning history or changing its totals. Refresh requests newer coverage and resets pagination. **Load older requests** stays within the same snapshot; expiry is explained and resets it.
-- **Stale data:** the page keeps same-scope cached evidence explicitly stale, with its last gateway update. Selection changes immediately clear old-scope panels and abort pending work. Epoch and exact-scope guards reject late responses. Expiration returns to All sessions only after fresh discovery confirms absence; an outage is not expiration.
+- **Session sources:** `(agent, recorded session)` is exact and case-sensitive. Claude Code/session A and Claude Code/session B get separate native source nodes. Two requests in session A share one node but keep independent native request flights. Codex/session A remains separate from Claude Code/session A. The original client icon/name/color remain; the existing subtitle shows a shortened session discriminator.
+- **Identity boundaries:** model/provider/folder changes do not split a known session; parent/child metadata does not merge recorded sessions. Missing or invalid session identities are labelled unknown and isolated per stable request, never assigned to a known session. This page cannot recover a header that Magpie already overrode or truncated.
+- **Destinations:** the original account/provider/model rows, reconciliation, folds and wires are retained. Safe account handles are shared across requests and sessions, so the same observed seat stays one native destination rather than becoming a new row per request.
+- **Native limits and motion:** the copied staging policy admits at most four source identities. The separate native `LIVE = 4` startup/resume request cap is also unchanged. Requests remain independently keyed inside the native flight/replay engine; this is not a claim that every concurrent request always has a visible animation. Original curves, bird artwork and animation algorithms are retained, with a hosting lifecycle that pauses on hidden/stale/disconnected views and clears obsolete state after a backend reset or authorization failure.
+- **Native upper interactions:** retained replay, focus, mask and account-fold behavior changes presentation only; replay never sends a model request. Lower Requests/Groups/provider editors, raw body/context viewers and configuration writes are outside this page. Settings links into excluded editors must not appear to perform a supported edit.
+- **Evidence boundaries:** the feed contains recent retained trace evidence, not full provider inventory. Account/provider/group names are privacy-safe labels; masks cannot disclose withheld original names. Available quota/rest/attempt evidence is preserved, but unknown values and withheld explanation details must remain unavailable. In particular, candidate count cannot justify the native sentence that only one configured account is enabled.
+- **Counters:** native gateway totals describe the gateway since its start, not the visible sessions. Missing counters are unavailable, not zero. The legacy scoped metrics/history APIs are retained separately; a period selector or history list is not added to this upper block.
+- **Shared service:** each frame reads the cached safe native feed. Multiple viewers still share one gateway collector. Hidden frames pause; authorization failures clear sensitive presentation and re-read options without rotating credentials.
 
-### Selection persistence limitation (FR-02.4)
+[Native-copy provenance](docs/native-copy-provenance.md) records the pinned original sources, deterministic extraction, session patch and unavoidable read-only/privacy differences. [Validation](docs/validation.md) separates original-to-extraction checks from extraction-to-session-copy checks.
 
-Magpie deliberately sandboxes this page without same-origin privileges. Browser storage is normally blocked, and there is no supported storage bridge. Selection is therefore **per frame / in memory** in the supported sandbox; reopening ordinarily returns to All sessions. A guarded, best-effort browser-local preference is used only if storage is available. No tokens are stored there, and no viewer selection is written into server-wide plugin options. Two tabs retain independent selections. Guaranteed persistence across reloads is an explicit unmet requirement until Magpie provides a safe per-viewer storage API; weakening sandboxing is not a workaround.
+### Sandboxed preferences (FR-02.4)
 
-## Metric definitions and coverage
+Magpie deliberately sandboxes this page without same-origin privileges. Browser storage is normally blocked, and there is no supported per-viewer storage bridge. Frame-local presentation preferences cannot be promised to persist across reloads; storage access must be guarded. No tokens are stored there, and no viewer preference is written into installation-wide plugin options. The earlier session-selection persistence requirement is not met by adding a selector to this native-copy scope; the corrected upper block has no such selector. Weakening sandboxing is not a workaround.
 
-All totals cite the selected scope and source. `—` means unavailable, never zero.
+## Retained scoped API metrics and coverage
+
+The following definitions apply to the existing normalized state/history APIs, **not** the native upper block's gateway-wide counters. These backend APIs remain available; this section does not imply that their former selectors/metric grid/history panels are still displayed. API totals cite their scope and source; unavailable values are not zero.
 
 | Metric | Definition |
 |---|---|
@@ -157,9 +162,9 @@ The MVP is a **single Magpie instance**. Each replica has its own loopback trace
 | Stale/disconnected | Check same-container loopback gateway and `MAGPIE_ADDR`; stale data is not live traffic. No remote-gateway or environment-proxy fallback is attempted. |
 | Incompatible gateway | Verify trace capability/shape and the compatibility matrix. Empty traffic is not a compatibility failure. |
 | Unauthorized / access stopped | Reopen the plugin page or Refresh to re-read options. Confirm the installation is enabled and unique; do not copy tokens into URLs. |
-| No sessions | Generate ordinary agent traffic through Magpie with native session headers. Remote clients do not need local files; missing/overridden/truncated original identity cannot be recovered. |
-| No cost / attempt history | This is expected when the selected source lacks pricing or retained attempts. A bounded trace/ledger is not a conversation archive. |
-| Selection resets on reopening | Expected sandbox limitation; see FR-02.4 above. |
+| No session sources | Use ordinary agent traffic through Magpie with native session headers. Remote clients do not need local files; missing/overridden/truncated original identity cannot be recovered. Native staging limits also apply. |
+| No cost / attempt history | Expected when the source lacks pricing or retained attempts. The native upper block does not add the earlier history panel; a bounded trace/ledger is not a conversation archive. |
+| Presentation preferences reset on reopening | Expected sandbox limitation; see FR-02.4 above. |
 
 Disable/remove using the **exact installation path/spec shown by `magpie plugin list`**, or the corresponding Magpie plugin controls. For the local-path installation above:
 

@@ -5,6 +5,7 @@ import { createServer as tcpServer, connect } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { Writable } from 'node:stream';
+import { readFile } from 'node:fs/promises';
 import { setImmediate as nextTurn } from 'node:timers/promises';
 import { createServer, ownershipProof, verifyOwnershipProof } from '../lib/server.mjs';
 import { ApiError, sessionKey } from '../lib/contracts.mjs';
@@ -56,7 +57,7 @@ async function fixture(t, overrides = {}) {
     installationId: randomBytes(16).toString('base64url'), apiToken: randomBytes(32).toString('base64url') };
   let starts = 0;
   let authorizations = 0;
-  const server = createServer({ config, aggregator: { snapshot },
+  const server = createServer({ config, aggregator: { snapshot, nativeSnapshot: () => ({ object: 'trace', routes: [] }) },
     history: { snapshot: async (scope) => snapshot(scope) },
     startCollector: () => { starts += 1; },
     authorizeInstallation: async () => { authorizations += 1; return true; },
@@ -92,6 +93,56 @@ test('fixed assets and health are public, inert, and carry protective headers', 
   }
 });
 
+test('only manifest-listed native runtime assets are served, with narrow native CSP needs', async t => {
+  const fx = await fixture(t, { loadStatic: undefined });
+  const manifest = JSON.parse(await readFile(new URL('../ui/vendor/magpie/static-manifest.json', import.meta.url), 'utf8'));
+  for (const file of manifest.files) {
+    const reply = await call(fx.config, `/${file}`);
+    assert.equal(reply.status, 200, file);
+    assert.equal(reply.headers['content-length'], String((await readFile(new URL(`../ui/${file}`, import.meta.url))).length));
+  }
+  for (const path of ['/vendor/magpie/upstream/plugins/routing/client.js', '/vendor/magpie/test-only/client.baseline.js',
+    '/vendor/magpie/static-manifest.json', '/vendor/magpie/source-manifest.json', '/vendor/magpie/source-grouping-patch.json',
+    '/vendor/magpie/icons/unknown.svg', '/vendor/magpie/icons/../client.js', '/native-lifecycle.inc.js']) {
+    assert.equal((await call(fx.config, path)).status, 404, path);
+  }
+  const csp = (await call(fx.config, '/')).headers['content-security-policy'];
+  assert.match(csp, /script-src 'self';/);
+  assert.match(csp, /style-src 'self'; style-src-attr 'unsafe-inline';/);
+  assert.match(csp, /img-src 'self' data:;/);
+  assert.doesNotMatch(csp, /unsafe-eval|allow-same-origin|https?:|\*/);
+  assert.equal(fx.starts, 0);
+});
+
+test('fixed native GET rejects every query and shares lazy authorized collector startup', async t => {
+  let calls = 0;
+  const fx = await fixture(t, { aggregator: { snapshot, nativeSnapshot() { calls++; return { object: 'trace', routes: [{ id: 1 }] }; } } });
+  const headers = { Origin: 'null', 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': 'authorization' };
+  assert.equal((await call(fx.config, '/api/native-routing', { method: 'OPTIONS', headers })).status, 204);
+  for (const query of ['period=live', 'session=unknown', 'includeChildren=0', 'url=http%3A%2F%2Fevil.test', `token=${fx.config.apiToken}`]) {
+    assert.equal((await fx.get(`/api/native-routing?${query}`)).status, 400);
+    assert.equal((await call(fx.config, `/api/native-routing?${query}`, { method: 'OPTIONS', headers })).status, 400);
+  }
+  for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']) assert.equal((await fx.get('/api/native-routing', { method })).status, 405);
+  assert.equal(fx.starts, 0); assert.equal(calls, 0);
+  const replies = await Promise.all([fx.get('/api/native-routing', { headers: { Origin: 'null' } }), fx.get('/api/state'), fx.get('/api/native-routing')]);
+  assert(replies.every(r => r.status === 200)); assert.equal(fx.starts, 1); assert.equal(calls, 2);
+  assert.deepEqual(JSON.parse(replies[0].text), { object: 'trace', routes: [{ id: 1 }] });
+  assert.equal(fx.authorizations, 9, 'all three reads revalidate before and after work');
+});
+
+test('native projection revalidates installation after work and enforces response size', async t => {
+  let allowed = true;
+  const fx = await fixture(t, { authorizeInstallation: async () => allowed,
+    aggregator: { nativeSnapshot() { allowed = false; return { secret: 'must not escape' }; } } });
+  const reply = await fx.get('/api/native-routing');
+  assert.equal(reply.status, 403); assert(!reply.text.includes('must not escape'));
+  const huge = await fixture(t, { maxResponseBytes: 2048, aggregator: { nativeSnapshot: () => ({ value: 'x'.repeat(2049) }) } });
+  assert.equal((await huge.get('/api/native-routing')).status, 503);
+  const denied = await fixture(t, { authorizeInstallation: async () => false });
+  assert.equal((await denied.get('/api/native-routing')).status, 403); assert.equal(denied.starts, 0);
+});
+
 test('exact Host and absent-or-single-null Origin apply even to public requests', async (t) => {
   const fx = await fixture(t);
   for (const Host of ['evil.test', `localhost:${fx.config.port}`, '127.0.0.1',
@@ -114,7 +165,7 @@ test('exact Host and absent-or-single-null Origin apply even to public requests'
 
 test('bearer authorization is exact and is never accepted from cookies or queries', async (t) => {
   const fx = await fixture(t);
-  for (const path of ['/api/state', '/api/sessions', '/api/history']) {
+  for (const path of ['/api/state', '/api/sessions', '/api/history', '/api/native-routing']) {
     for (const Authorization of [undefined, 'Bearer wrong', `bearer ${fx.config.apiToken}`, fx.config.apiToken,
       `Basic ${fx.config.apiToken}`, `Bearer ${fx.config.apiToken}, Bearer ${fx.config.apiToken}`]) {
       const res = await call(fx.config, path, { headers: Authorization ? { Authorization } : {} });
@@ -336,7 +387,7 @@ async function heldFixture(t, overrides = {}) {
   transport.close = (done) => done();
   transport.address = () => ({ address: config.host, port: config.port });
   const responses = [];
-  const server = createServer({ config, aggregator: { snapshot }, authorizeInstallation: async () => true,
+  const server = createServer({ config, aggregator: { snapshot, nativeSnapshot: () => ({ object: 'trace', routes: [] }) }, authorizeInstallation: async () => true,
     loadStatic: async () => Buffer.from('small asset'), maxConcurrent: 1,
     createHttpServer: (_options, listener) => { dispatch = listener; return transport; }, ...overrides });
   t.after(async () => { for (const response of responses) response.destroy(); await server.stop(); });
