@@ -1926,14 +1926,23 @@ function routingPage(host) {
     }
     return groups;
   }
-  function actorLabels(ids) {
-    const sorted = [...ids].filter(Boolean).sort(), labels = new Map();
-    const common = (a, b = "") => { let n = 0; while (n < a.length && a[n] === b[n]) n++; return n; };
-    for (let i = 0; i < sorted.length; i++) {
-      const id = sorted[i], n = Math.max(14, common(id, sorted[i - 1]) + 1, common(id, sorted[i + 1]) + 1);
-      labels.set(id, id.length > n ? id.slice(0, n) + "…" : id);
+  function actorModels(requests) {
+    const groups = new Map(), models = new Map();
+    const concrete = (value) => typeof value === "string" && value.length && !value.startsWith("group/");
+    for (const r of requests) {
+      if (!r.isSubagent && !r.actorId) continue;
+      const key = r.actorId || null;
+      let group = groups.get(key);
+      if (!group) groups.set(key, group = { active: new Set(), ended: new Set() });
+      const model = concrete(r.served) ? r.served :
+        !r.evidence?.reasons?.includes("model_unavailable") && concrete(r.model) ? r.model : null;
+      (r.done ? group.ended : group.active).add(model);
     }
-    return labels;
+    for (const [id, group] of groups) {
+      const selected = group.active.size ? group.active : group.ended;
+      models.set(id, [...selected].filter((m) => m !== null).sort().concat(selected.has(null) ? [null] : []));
+    }
+    return models;
   }
   function sourceActivity(a, requests) {
     const groups = actorGroups(requests);
@@ -1944,7 +1953,13 @@ function routingPage(host) {
     }
     if (!a.activity) {
       const node = el("details", "rt-activity"), summary = el("summary"),
+        label = el("span"), chev = el("span", "chev"),
         list = el("ul", "rt-actors"), overflow = el("span", "rt-activity-overflow");
+      setText(label, t("Sub-agent activity"));
+      chev.append(svg(CHEV, 12, 1.7));
+      chev.setAttribute("aria-hidden", "true");
+      summary.append(label, chev);
+      setAttr(summary, "title", t("Gateway request activity only; task completion is unknown."));
       node.open = true;
       list.tabIndex = 0;
       node.append(summary, list, overflow);
@@ -1963,29 +1978,34 @@ function routingPage(host) {
       list.addEventListener("scroll", activity.measure, { passive: true });
       node.addEventListener("toggle", activity.measure);
     }
-    const { summary, list, entries, measure } = a.activity, labels = actorLabels(groups.keys());
+    const { list, entries, measure } = a.activity, models = actorModels(requests);
     for (const [id, e] of entries) if (!groups.has(id)) { e.node.remove(); entries.delete(id); }
-    let total = 0, active = 0;
     for (const [id, group] of groups) {
-      total += group.active + group.ended; active += group.active;
       let e = entries.get(id);
       if (!e) {
-        const node = el("li", "rt-actor"), label = el("span", "rt-actor-label"), count = el("span", "rt-actor-count");
-        node.dataset.actorId = id || "";
-        node.append(label, count); list.append(node);
-        entries.set(id, e = { node, label, count });
+        const node = el("li", "rt-actor"), label = el("b", "rt-actor-label"),
+          chips = el("span", "rt-actor-models"), state = el("i", "rt-actor-state"), fan = svg(FAN, 14, 1.5);
+        fan.setAttribute("aria-hidden", "true");
+        node.style.setProperty("--depth", 1);
+        node.append(fan, label, chips, state); list.append(node);
+        entries.set(id, e = { node, label, chips, state, models: "" });
       }
-      const label = id ? t("Actor {id}", { id: labels.get(id) }) : t("Sub-agent activity — actor unavailable");
-      const count = t("Active gateway requests: {n}", { n: group.active }) +
-        (group.ended ? " · " + t("Gateway requests ended: {n}", { n: group.ended }) : "");
-      setText(e.label, label); setText(e.count, count);
-      setAttr(e.node, "title", (id || label) + "\n" + count + "\n" + t("Gateway request activity only; task completion is unknown."));
-      e.node.classList.toggle("active", group.active > 0);
+      const label = t(id ? "Sub-agent" : "Sub-agent activity"), names = models.get(id).map((m) => m ?? t("Unknown model"));
+      const state = t(group.active > 1 ? "{n} requests active" : group.active ? "Request active" : "Requests ended", { n: group.active });
+      const signature = JSON.stringify(names);
+      if (signature !== e.models) {
+        e.chips.replaceChildren(...names.map((name) => {
+          const chip = el("code", "mdl");
+          setText(chip, name); setAttr(chip, "title", name);
+          return chip;
+        }));
+        e.models = signature;
+      }
+      setText(e.label, label); setText(e.state, state);
+      setAttr(e.node, "title", [label, names.join(", "), state,
+        t("{active} active requests; {ended} ended requests", { active: group.active, ended: group.ended })].join("\n"));
+      e.node.classList.toggle("on", group.active > 0);
     }
-    setText(summary, t("Sub-agent activity · {n} requests", { n: total }));
-    setAttr(summary, "aria-label", t("Sub-agent activity: {actors} identified actors; {unknown} requests with actor unavailable; {active} active gateway requests", {
-      actors: groups.size - Number(groups.has(null)), unknown: groups.has(null) ? groups.get(null).active + groups.get(null).ended : 0, active,
-    }));
     setAttr(list, "aria-label", t("Sub-agent gateway requests — scroll for all activity"));
     measure();
   }

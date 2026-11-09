@@ -116,14 +116,23 @@ export const SOURCE_ACTIVITY = `
     }
     return groups;
   }
-  function actorLabels(ids) {
-    const sorted = [...ids].filter(Boolean).sort(), labels = new Map();
-    const common = (a, b = "") => { let n = 0; while (n < a.length && a[n] === b[n]) n++; return n; };
-    for (let i = 0; i < sorted.length; i++) {
-      const id = sorted[i], n = Math.max(14, common(id, sorted[i - 1]) + 1, common(id, sorted[i + 1]) + 1);
-      labels.set(id, id.length > n ? id.slice(0, n) + "…" : id);
+  function actorModels(requests) {
+    const groups = new Map(), models = new Map();
+    const concrete = (value) => typeof value === "string" && value.length && !value.startsWith("group/");
+    for (const r of requests) {
+      if (!r.isSubagent && !r.actorId) continue;
+      const key = r.actorId || null;
+      let group = groups.get(key);
+      if (!group) groups.set(key, group = { active: new Set(), ended: new Set() });
+      const model = concrete(r.served) ? r.served :
+        !r.evidence?.reasons?.includes("model_unavailable") && concrete(r.model) ? r.model : null;
+      (r.done ? group.ended : group.active).add(model);
     }
-    return labels;
+    for (const [id, group] of groups) {
+      const selected = group.active.size ? group.active : group.ended;
+      models.set(id, [...selected].filter((m) => m !== null).sort().concat(selected.has(null) ? [null] : []));
+    }
+    return models;
   }
   function sourceActivity(a, requests) {
     const groups = actorGroups(requests);
@@ -134,7 +143,13 @@ export const SOURCE_ACTIVITY = `
     }
     if (!a.activity) {
       const node = el("details", "rt-activity"), summary = el("summary"),
+        label = el("span"), chev = el("span", "chev"),
         list = el("ul", "rt-actors"), overflow = el("span", "rt-activity-overflow");
+      setText(label, t("Sub-agent activity"));
+      chev.append(svg(CHEV, 12, 1.7));
+      chev.setAttribute("aria-hidden", "true");
+      summary.append(label, chev);
+      setAttr(summary, "title", t("Gateway request activity only; task completion is unknown."));
       node.open = true;
       list.tabIndex = 0;
       node.append(summary, list, overflow);
@@ -153,42 +168,47 @@ export const SOURCE_ACTIVITY = `
       list.addEventListener("scroll", activity.measure, { passive: true });
       node.addEventListener("toggle", activity.measure);
     }
-    const { summary, list, entries, measure } = a.activity, labels = actorLabels(groups.keys());
+    const { list, entries, measure } = a.activity, models = actorModels(requests);
     for (const [id, e] of entries) if (!groups.has(id)) { e.node.remove(); entries.delete(id); }
-    let total = 0, active = 0;
     for (const [id, group] of groups) {
-      total += group.active + group.ended; active += group.active;
       let e = entries.get(id);
       if (!e) {
-        const node = el("li", "rt-actor"), label = el("span", "rt-actor-label"), count = el("span", "rt-actor-count");
-        node.dataset.actorId = id || "";
-        node.append(label, count); list.append(node);
-        entries.set(id, e = { node, label, count });
+        const node = el("li", "rt-actor"), label = el("b", "rt-actor-label"),
+          chips = el("span", "rt-actor-models"), state = el("i", "rt-actor-state"), fan = svg(FAN, 14, 1.5);
+        fan.setAttribute("aria-hidden", "true");
+        node.style.setProperty("--depth", 1);
+        node.append(fan, label, chips, state); list.append(node);
+        entries.set(id, e = { node, label, chips, state, models: "" });
       }
-      const label = id ? t("Actor {id}", { id: labels.get(id) }) : t("Sub-agent activity — actor unavailable");
-      const count = t("Active gateway requests: {n}", { n: group.active }) +
-        (group.ended ? " · " + t("Gateway requests ended: {n}", { n: group.ended }) : "");
-      setText(e.label, label); setText(e.count, count);
-      setAttr(e.node, "title", (id || label) + "\\n" + count + "\\n" + t("Gateway request activity only; task completion is unknown."));
-      e.node.classList.toggle("active", group.active > 0);
+      const label = t(id ? "Sub-agent" : "Sub-agent activity"), names = models.get(id).map((m) => m ?? t("Unknown model"));
+      const state = t(group.active > 1 ? "{n} requests active" : group.active ? "Request active" : "Requests ended", { n: group.active });
+      const signature = JSON.stringify(names);
+      if (signature !== e.models) {
+        e.chips.replaceChildren(...names.map((name) => {
+          const chip = el("code", "mdl");
+          setText(chip, name); setAttr(chip, "title", name);
+          return chip;
+        }));
+        e.models = signature;
+      }
+      setText(e.label, label); setText(e.state, state);
+      setAttr(e.node, "title", [label, names.join(", "), state,
+        t("{active} active requests; {ended} ended requests", { active: group.active, ended: group.ended })].join("\\n"));
+      e.node.classList.toggle("on", group.active > 0);
     }
-    setText(summary, t("Sub-agent activity · {n} requests", { n: total }));
-    setAttr(summary, "aria-label", t("Sub-agent activity: {actors} identified actors; {unknown} requests with actor unavailable; {active} active gateway requests", {
-      actors: groups.size - Number(groups.has(null)), unknown: groups.has(null) ? groups.get(null).active + groups.get(null).ended : 0, active,
-    }));
     setAttr(list, "aria-label", t("Sub-agent gateway requests — scroll for all activity"));
     measure();
   }
 `;
 const ACTIVITY_TRANSLATIONS = {
   'zh-TW': {
-    'Actor {id}': '行為者 {id}',
-    'Sub-agent activity — actor unavailable': '子代理活動 — 行為者不明',
-    'Active gateway requests: {n}': '進行中的閘道請求：{n}',
-    'Gateway requests ended: {n}': '已結束的閘道請求：{n}',
+    'Sub-agent': '子代理',
+    'Sub-agent activity': '子代理活動',
+    'Request active': '請求中',
+    '{n} requests active': '{n} 個請求中',
+    'Requests ended': '請求已結束',
+    '{active} active requests; {ended} ended requests': '{active} 個請求中；{ended} 個請求已結束',
     'Gateway request activity only; task completion is unknown.': '僅表示閘道請求活動；無法判定任務是否完成。',
-    'Sub-agent activity · {n} requests': '子代理活動 · {n} 個請求',
-    'Sub-agent activity: {actors} identified actors; {unknown} requests with actor unavailable; {active} active gateway requests': '子代理活動：{actors} 個已識別行為者；{unknown} 個行為者不明的請求；{active} 個進行中的閘道請求',
     'Sub-agent gateway requests — scroll for all activity': '子代理閘道請求 — 捲動以查看所有活動',
     '{n} activity entries outside view; scroll to view all': '{n} 個活動項目未顯示；捲動以查看全部',
   },
@@ -335,7 +355,7 @@ export function generate({ upstream, check=false }={}) {
       {location:'account labels and tooltips', difference:'Stable opaque backend handles and neutral names replace raw account identities; mask only hides these neutral labels. External live quota windows are not read.'},
       {location:'group / provider headings', difference:'Recorded safe provider names and bundled icon/preset metadata retain native precedence; unavailable or unsupported metadata uses neutral/generic fallback. Private group/account identities remain opaque and settings navigation is removed, not stubbed.'},
       {location:'source names / model subtitles', difference:'Pinned built-in client labels/icons replace installed-client inventory. A separately disclosed project basename precedes the short session, including a single project; model and full session remain in the tooltip. No folder-to-project inference. Full folder metadata is separately opt-in.'},
-      {location:'source child activity / ui/style.css', difference:'Plugin-owned flat activity boxes inside the exact session source summarize all retained source-local active/recent requests by opaque actor, with one unknown-actor request bucket. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. Collapsible keyboard/touch scroll exposes all retained entries; no added actor cap. Only this extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English.'},
+      {location:'source child activity / ui/style.css', difference:'Source-local child rows copy the pinned native nested-group presentation (routing.css lines 71-107), with depth-1 indentation, concrete observed models and request-only states. Opaque actor keys remain internal: no displayed IDs or numbering; one unknown-actor activity aggregate. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. A list-wide disclosure and keyboard/touch scroll expose all retained entries; no added actor cap. Only this scoped extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English.'},
       {location:'gateway subtitle / clock', difference:'Collected process identity is shown without a gateway URL; missing source clock blocks live playback. Group clock configuration is unavailable.'},
       {location:'quota / formatting helpers', difference:'Recorded quota fields remain; provider-supplied display text, live windows, expiry inventory, currency preferences and exchange rates are not fetched. Native default number/USD formatting remains.'},
       {location:'transport / lifecycle', difference:'Authenticated bounded whole snapshots replace core polling; collector live status is not process ownership. Hidden/aborted/revoked and generation reset paths clear or pause native playback.'},

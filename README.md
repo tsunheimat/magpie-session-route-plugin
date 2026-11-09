@@ -2,7 +2,7 @@
 
 A read-only plugin page that copies Magpie's **native upper Routing block**, changing client/source grouping to the exact **agent + recorded native session ID**. Different sessions of the same client have separate source nodes; concurrent requests in one session share one source and keep independent native flights. Right-hand account/provider/model rows remain shared. The original **Routing** page and **Routing Groups** editor are not replaced.
 
-**v0.3.1 — project names, sub-agent activity and native provider branding.** This version corrects v0.3.0's missing single-project labels and substituted provider names/icons, and adds flat sub-agent activity boxes inside their recorded session. The native renderer, shared destination identities and original session-level flights remain. Existing release tags are unchanged. See [validation](docs/validation.md) for version-specific evidence and remaining boundaries.
+**v0.3.2 — native nested sub-agent rows.** Sub-agent activity now uses the original nested-routing-group row presentation, indented inside its session, with observed models and request states instead of actor IDs or numbered labels. The project labels and provider branding corrected in v0.3.1 remain, as do shared destinations and original session-level flights. Existing release tags are unchanged. Custom uploaded provider artwork remains unsupported. See [validation](docs/validation.md) for version-specific evidence and remaining boundaries.
 
 The service runs **inside Magpie’s existing Bun plugin host**, listening only on `127.0.0.1`. No extra daemon/container, model calls, routing middleware or persistent traffic archive is added. The browser reaches it through Magpie’s authenticated plugin-page service proxy—not the browser’s localhost.
 
@@ -14,12 +14,12 @@ The package is named `magpie-session-routing` and is distributed through GitHub;
 
 ## Install in an existing Magpie installation
 
-The commands in this section select **v0.3.1**, including project/sub-agent/provider display corrections. Use the local-directory method below to test a local checkout.
+The commands in this section select **v0.3.2**, including native nested sub-agent rows and the earlier project/provider display corrections. Use the local-directory method below to test a local checkout.
 
 Run under the same account and configuration environment as Magpie:
 
 ```sh
-magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.1
+magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.2
 magpie plugin list
 ```
 
@@ -29,16 +29,16 @@ Run the CLI inside the **existing Magpie container**, not on the Kubernetes host
 
 ```sh
 kubectl exec -n <namespace> <magpie-pod> -c <magpie-container> -- \
-  magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.1
+  magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.2
 ```
 
 The official image keeps configuration and installed plugins under `/config`; persist that mount with your existing PVC. Leave the container's HOME/XDG environment unchanged. No extra pod, Service, Ingress rule, or exposed plugin port is needed. Refresh the WebUI after installation; a pod restart should normally be unnecessary. Then complete secure first-use setup below. This is a single-instance plugin, not a cross-replica collector.
 
-### Upgrade from v0.1.0, v0.2.0 or v0.3.0
+### Upgrade from v0.1.0 through v0.3.1
 
-Run the same `magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.1` command inside the existing Magpie container. These versions use the same package name `magpie-session-routing`, so Magpie replaces the existing entry and preserves its options and enabled/disabled state. **Do not remove the old entry first**—removal deletes its saved options. Close/reopen Session Routing after the upgrade; previously configured secure access is reused.
+Run the same `magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.2` command inside the existing Magpie container. These versions use the same package name `magpie-session-routing`, so Magpie replaces the existing entry and preserves its options and enabled/disabled state. **Do not remove the old entry first**—removal deletes its saved options. Close/reopen Session Routing after the upgrade; previously configured secure access is reused.
 
-`magpie plugin update` alone reinstalls a Git plugin's existing pinned spec; it does not change `#v0.1.0`, `#v0.2.0` or `#v0.3.0` to the new tag. If you previously installed from a local directory or have multiple entries, inspect `magpie plugin list` and use the appropriate installation path rather than creating another enabled instance.
+`magpie plugin update` alone reinstalls a Git plugin's existing pinned spec; it does not change an earlier pin such as `#v0.3.1` to the new tag. If you previously installed from a local directory or have multiple entries, inspect `magpie plugin list` and use the appropriate installation path rather than creating another enabled instance.
 
 ### Local directory or archive
 
@@ -95,7 +95,7 @@ This is the actual copied native upper block, not a newly drawn equivalent. Ther
 
 - **Session sources:** `(agent, recorded session)` is exact and case-sensitive. Claude Code/session A and Claude Code/session B get separate native source nodes. Two requests in session A share one node but keep independent native request flights. Codex/session A remains separate from Claude Code/session A. The original client icon/name/color remain; the existing subtitle shows a shortened session discriminator.
 - **Projects:** a recorded project basename appears even for a session with only one project, followed by the short session discriminator. Model and full session ID remain in the native tooltip. Missing evidence is not guessed, and equal project names do not merge sessions.
-- **Sub-agent activity:** small boxes inside a session show observed actors and their active gateway requests. Repeated requests by one actor share its box; known workers from different sessions remain distinct. Kind-only or conflicting identity evidence is explicitly unknown actor activity, not an invented worker count. The boxes are flat, not a recursive agent tree: trace does not expose a complete parent-agent chain, and `parentSession` is title-helper metadata. Flights still use the session's native source wire/origin. Independent recorded child sessions remain separate sources. No activity means no observed in-flight request, not that a worker's whole task finished.
+- **Sub-agent activity:** indented native nested-group-style rows sit inside their recorded session. Each row shows “Sub-agent”, concrete observed model(s) and request activity; no actor IDs or substitute numbers appear. Repeated requests by one actor share its row, even across models; different actors remain distinct even when their models match. Models come from active requests, or retained ended requests if none are active. Kind-only or conflicting identity evidence stays one “Sub-agent activity” aggregate, not an invented worker count. The list folds and scrolls without an additional actor cap beyond the retained trace. This is a one-level session subdivision, not a recursive agent tree: trace does not expose a complete parent-agent chain, and `parentSession` is title-helper metadata. Flights still use the session's native source wire/origin; independent recorded sessions remain separate. “Requests ended” never means the worker's whole task finished.
 - **Identity boundaries:** model/provider/folder changes do not split a known session; parent/child metadata does not merge recorded sessions. Missing or invalid session identities are labelled unknown and isolated per stable request, never assigned to a known session. This page cannot recover a header that Magpie already overrode or truncated.
 - **Destinations:** the original account/provider/model rows, reconciliation, folds and wires are retained. Safe account handles are shared across requests and sessions, so the same observed seat stays one native destination rather than becoming a new row per request.
 - **Native limits and motion:** the copied staging policy admits at most four source identities. The separate native `LIVE = 4` startup/resume request cap is also unchanged. Requests remain independently keyed inside the native flight/replay engine; this is not a claim that every concurrent request always has a visible animation. Original curves, bird artwork and animation algorithms are retained, with a hosting lifecycle that pauses on hidden/stale/disconnected views and clears obsolete state after a backend reset or authorization failure.

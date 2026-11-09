@@ -74,7 +74,7 @@ export async function noOverflow(service, label) {
     // body. Check that inner scroller AND actual bounds, not the clipped body.
     return { viewport: innerWidth, root: document.documentElement.scrollWidth,
       view: { client: view.clientWidth, scroll: view.scrollWidth },
-      nodes: [...document.querySelectorAll('#rt,.rt-stage,.rt-src,.rt-hub,.rt-accts,.rt-accts>li,.rt-cap,.rt-stats,.rt-log-head,.rt-steps')]
+      nodes: [...document.querySelectorAll('#rt,.rt-stage,.rt-src,.rt-activity,.rt-actors,.rt-actor,.rt-actor-models,.rt-actor code.mdl,.rt-hub,.rt-accts,.rt-accts>li,.rt-cap,.rt-stats,.rt-log-head,.rt-steps')]
         .filter(n => n.getBoundingClientRect().width && n.getBoundingClientRect().height)
         .map(n => ({ selector: n.className, left: n.getBoundingClientRect().left, right: n.getBoundingClientRect().right })) };
   });
@@ -200,11 +200,14 @@ await test(`${engineName}: copied native upper block through the production opaq
   });
 
   await t.test('native request flights remain independent; startup and visibility resume keep LIVE=4', async t => {
-    const harness = await browserHarness({ fixture: nativeTrace({ sessions: Array(6).fill('one-session') }) }); t.after(() => harness.close());
+    const fixture = nativeTrace({ sessions: Array(6).fill('one-session') });
+    fixture.routes.forEach(r => { r.sub = `private-actor-${r.id}`; });
+    const harness = await browserHarness({ fixture }); t.after(() => harness.close());
     const h = await contextFor(browser, harness, { width: 1280, height: 900 }, 'no-preference'); t.after(() => h.context.close());
     const service = await readyStage(h.page, h.frame);
     await service.waitForFunction(() => document.querySelectorAll('.rt-sky .pkt').length === 4);
     assert.equal(await h.frame.locator('.rt-src').count(), 1);
+    assert.equal(await h.frame.locator('.rt-actor').count(), 6, 'activity is not restricted to the four starting flights');
     await h.page.evaluate(() => window.testVisibility(false));
     await service.waitForFunction(() => document.querySelectorAll('.rt-sky .pkt').length === 0);
     const before = reads(harness); await h.page.waitForTimeout(1200);
@@ -213,7 +216,7 @@ await test(`${engineName}: copied native upper block through the production opaq
     await service.waitForFunction(() => document.querySelectorAll('.rt-sky .pkt').length === 4);
     harness.revoke();
     await h.frame.locator('.rt-off').filter({ hasText: /Access is unavailable or was revoked/ }).waitFor();
-    assert.equal(await h.frame.locator('.rt-src').count(), 0);
+    assert.equal(await h.frame.locator('.rt-src,.rt-actor,.rt-activity').count(), 0);
     assert.equal(await h.frame.locator('.rt-sky .pkt,.rt-sky .bird').count(), 0);
     assert.equal(await h.frame.locator('.rt-steps').textContent(), '');
     assert.equal(await service.evaluate(() => document.querySelector('#rt').getAnimations({ subtree: true }).filter(a => a.playState === 'running').length), 0);
@@ -371,53 +374,85 @@ await test(`${engineName}: copied native upper block through the production opaq
     noErrors(other);
   });
 
-  await t.test('source-local sub-agent boxes show observed requests without changing flight endpoints or source caps', async t => {
-    const fixture = nativeTrace({ sessions: ['alpha', 'alpha', 'alpha', 'alpha', 'bravo'] });
-    const [main, first, helper, unknown, independent] = fixture.routes;
+  await t.test('native source-local child rows show observed models and request states without changing flight endpoints or caps', async t => {
+    const fixture = nativeTrace({ sessions: ['alpha', 'alpha', 'alpha', 'alpha', 'alpha', 'alpha', 'alpha', 'bravo', 'alpha'],
+      agents: ['claude', 'claude', 'claude', 'claude', 'claude', 'claude', 'claude', 'claude', 'codex'] });
+    const [main, first, helper, second, unknown, conflict, title, independent, otherAgent] = fixture.routes;
     main.folder = 'private-parent/project-alpha';
     first.subagentId = first.sub = 'private-actor-one'; helper.sub = 'private-actor-one';
-    unknown.kind = 'collab_spawn'; independent.sub = 'private-actor-one'; independent.parentSession = 'alpha';
+    first.model = 'group/opaque-request'; first.served = 'z-model'; helper.model = 'a-model';
+    second.sub = 'private-actor-two'; second.model = 'a-model';
+    unknown.kind = 'collab_spawn'; delete unknown.model;
+    conflict.sub = 'private-conflict-one'; conflict.subagentId = 'private-conflict-two';
+    title.kind = 'title'; title.parentSession = 'bravo';
+    independent.sub = otherAgent.sub = 'private-actor-one'; independent.parentSession = 'alpha';
     const harness = await browserHarness({ fixture }); t.after(() => harness.close());
     const h = await contextFor(browser, harness, { width: 1280, height: 1000 }, 'no-preference', observeNative);
     t.after(() => h.context.close()); const service = await readyStage(h.page, h.frame);
-    const alpha = h.frame.locator('.rt-src[title*="Session id: alpha"]');
+    const alpha = h.frame.locator('.rt-src[title^="Claude Code"][title*="Session id: alpha"]');
     const bravo = h.frame.locator('.rt-src[title*="Session id: bravo"]');
-    await service.waitForFunction(() => document.querySelectorAll('.rt-actor').length === 3);
-    assert.equal(await h.frame.locator('.rt-src').count(), 2);
-    assert.equal(await alpha.locator('.rt-actor').count(), 2);
+    const codex = h.frame.locator('.rt-src[title^="Codex"][title*="Session id: alpha"]');
+    await service.waitForFunction(() => document.querySelectorAll('.rt-actor').length === 5);
+    assert.equal(await h.frame.locator('.rt-src').count(), 3);
+    assert.equal(await alpha.locator('.rt-actor').count(), 3);
     assert.equal(await bravo.locator('.rt-actor').count(), 1, 'independent recorded session is not reparented');
-    assert.match(await alpha.locator('.rt-actor[data-actor-id]:not([data-actor-id=""]) .rt-actor-count').innerText(), /Active gateway requests: 2/);
-    assert.match(await alpha.locator('.rt-actor[data-actor-id=""]').innerText(), /actor unavailable/);
-    assert.match(await alpha.locator('summary').getAttribute('aria-label'), /1 identified actors; 1 requests with actor unavailable; 3 active gateway requests/);
-    assert.doesNotMatch(await h.frame.locator('#rt').innerText(), /private-actor|private-parent/);
+    assert.equal(await codex.locator('.rt-actor').count(), 1, 'same opaque actor and session under another agent stays independent');
+    const known = alpha.locator('.rt-actor').nth(0), sameModel = alpha.locator('.rt-actor').nth(1), aggregate = alpha.locator('.rt-actor').nth(2);
+    assert.deepEqual(await alpha.locator('b.rt-actor-label').allTextContents(), ['Sub-agent', 'Sub-agent', 'Sub-agent activity']);
+    assert.deepEqual(await known.locator('code.mdl').allTextContents(), ['a-model', 'z-model']);
+    assert.deepEqual(await sameModel.locator('code.mdl').allTextContents(), ['a-model']);
+    assert.deepEqual(await aggregate.locator('code.mdl').allTextContents(), ['example-model', 'Unknown model']);
+    assert.equal(await known.locator('i.rt-actor-state').innerText(), '2 requests active');
+    assert.equal(await sameModel.locator('i.rt-actor-state').innerText(), 'Request active');
+    assert.equal(await aggregate.locator('i.rt-actor-state').innerText(), '2 requests active');
+    assert.equal(await alpha.locator('summary').innerText(), 'Sub-agent activity');
+    assert.equal(await alpha.locator('summary').getAttribute('title'), 'Gateway request activity only; task completion is unknown.');
+    const activityDom = await h.frame.locator('.rt-activity').evaluateAll(ns => ns.map(n => n.outerHTML).join('\n'));
+    assert.doesNotMatch(activityDom, /data-actor-id|actor_|private-actor|private-conflict|Sub-agent [#\d]|group\/|Agent completed/);
+    assert.equal(await h.frame.locator('.rt-actor[role],.rt-actor[tabindex],.rt-actor[aria-expanded],.rt-actor.active,.rt-actor .chev').count(), 0);
+    assert.equal(await h.frame.locator('.rt-actor').evaluateAll(ns => ns.every(n => n.classList.contains('on') && n.style.getPropertyValue('--depth') === '1')), true);
+    assert.doesNotMatch(await h.frame.locator('#rt').innerText(), /private-actor|private-conflict|private-parent/);
     await service.waitForFunction(() => document.querySelectorAll('.rt-sky .pkt.held').length === 4);
-    assert.equal(await h.frame.locator('.rt-src .rt-src').count(), 0, 'activity boxes are not extra native sources');
+    assert.equal(await h.frame.locator('.rt-src .rt-src,.rt-src .rt-accts,.rt-src .rt-wires').count(), 0, 'child rows are not extra native sources or destinations');
     assert.equal(await h.frame.locator('.rt-accts > li').count(), 2, 'same original account seats remain shared');
-    await service.evaluate(() => { window.actorNodes = [...document.querySelectorAll('.rt-actor')]; });
-    const before = reads(harness); await waitUntil(() => reads(harness) >= before + 3, 'unchanged actor polls complete');
-    assert.equal(await service.evaluate(() => actorNodes.every(n => n.isConnected)), true);
+    await service.evaluate(() => {
+      window.actorNodes = [...document.querySelectorAll('.rt-actor')];
+      window.actorChips = [...document.querySelectorAll('.rt-actor code.mdl')];
+    });
+    assert.notEqual(await alpha.locator('details').getAttribute('open'), null, 'activity starts expanded');
     await alpha.locator('summary').focus(); await h.page.keyboard.press('Enter');
     assert.equal(await alpha.locator('details').getAttribute('open'), null);
+    const before = reads(harness); await waitUntil(() => reads(harness) >= before + 3, 'unchanged actor polls complete');
+    assert.equal(await service.evaluate(() => actorNodes.every((n,i) => n === document.querySelectorAll('.rt-actor')[i]) && actorChips.every(n => n.isConnected)), true);
+    assert.equal(await alpha.locator('details').getAttribute('open'), null, 'polls preserve disclosure choice');
     await h.page.keyboard.press('Enter');
     assert.notEqual(await alpha.locator('details').getAttribute('open'), null);
-    await noOverflow(service, 'sub-agent activity desktop');
-    await capture(h.page, h.frame, 'project-subagents');
-    await h.page.setViewportSize({ width: 390, height: 1000 });
-    await service.waitForFunction(() => document.querySelector('#rt').classList.contains('max560'));
-    await h.page.evaluate(() => window.testTheme(true));
-    await service.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
-    await noOverflow(service, 'sub-agent activity mobile dark');
-    await capture(h.page, h.frame, 'project-subagents-mobile-dark');
+    for (const [size, width] of [['desktop', 1280], ['mobile', 390]]) {
+      await h.page.setViewportSize({ width, height: 1000 });
+      await service.waitForFunction(mobile => document.querySelector('#rt').classList.contains('max560') === mobile, size === 'mobile');
+      for (const dark of [false, true]) {
+        await h.page.evaluate(v => window.testTheme(v), dark);
+        await service.waitForFunction(theme => document.documentElement.dataset.theme === theme, dark ? 'dark' : 'light');
+        await noOverflow(service, `sub-agent activity ${size} ${dark ? 'dark' : 'light'}`);
+        await capture(h.page, h.frame, `nested-subagents-${size}-${dark ? 'dark' : 'light'}`);
+      }
+    }
     await service.waitForFunction(() => document.querySelectorAll('.rt-sky .pkt.held').length === 4);
     await service.evaluate(() => { window.actorFlights = [...document.querySelectorAll('.rt-sky .pkt.held')].map(node => flightRecords.find(r => r.node === node)); });
     for (const r of fixture.routes) { r.done = true; r.status = 200; r.ms = 900; r.tries[0].done = true; r.tries[0].status = 200; r.tries[0].ms = 900; }
     update(harness, fixture);
     await service.waitForFunction(() => actorFlights.every(r => !r.node.isConnected));
     const returns = await service.evaluate(() => actorFlights.map(({ first, last, samples }) => ({ first, last, samples })));
-    for (const flight of returns) assertHome(flight, flight.first.near.title.includes('Session id: alpha') ? 'alpha' : 'bravo');
-    await service.waitForFunction(() => !document.querySelector('.rt-actor.active'));
+    for (const flight of returns) {
+      assertHome(flight, flight.first.near.title.includes('Session id: alpha') ? 'alpha' : 'bravo');
+      assert.equal(flight.last.near.title, flight.first.near.title, 'reply returns to the exact agent and session, including same-session Codex');
+    }
+    await service.waitForFunction(() => !document.querySelector('.rt-actor.on'));
+    assert.deepEqual(await h.frame.locator('.rt-actor-state').allTextContents(), Array(5).fill('Requests ended'));
+    assert.deepEqual(await known.locator('code.mdl').allTextContents(), ['a-model', 'z-model']);
     fixture.routes = [main, independent]; fixture.ids = fixture.routes.map(r => r.id); update(harness, fixture);
     await service.waitForFunction(() => !document.querySelector('.rt-src[title*="Session id: alpha"] .rt-activity'));
+    assert.equal(await service.evaluate(() => actorNodes.filter(n => n.isConnected).length), 1, 'eviction retains only the independent session actor');
     harness.aggregator.setConnection({ status: 'stale', reason: 'gateway_unavailable' });
     await service.waitForFunction(() => !document.querySelector('.rt-src,.rt-actor,.rt-sky .pkt'));
     noErrors(h);
@@ -524,13 +559,13 @@ await test(`${engineName}: copied native upper block through the production opaq
     // Native heading-to-row branches use quadratic Q/L, unlike the simple
     // readyStage fixture's cubic C. Require all ten actual wire paths, not C.
     await service.waitForFunction(()=>{const ps=[...document.querySelectorAll('.rt-wires path')];return ps.length===10&&ps.every(p=>/^M/.test(p.getAttribute('d'))&&/[CQ]/.test(p.getAttribute('d'))&&p.getTotalLength()>0);});
-    assert.equal(await h.frame.locator('.rt-sub').count(),3);
+    assert.equal(await h.frame.locator('.rt-accts > li.rt-sub').count(),3);
     assert.equal(await h.frame.locator('.rt-accts>li[title]:not(.rt-sub)').count(),4);
     assert.deepEqual(await h.frame.locator('.rt-src b').allTextContents(),['Claude Code','Pi','OpenCode']);
-    assert((await h.frame.locator('.rt-sub').evaluateAll(ns=>ns.map(n=>n.title))).some(s=>s.includes('Sent by Pi')));
+    assert((await h.frame.locator('.rt-accts > li.rt-sub').evaluateAll(ns=>ns.map(n=>n.title))).some(s=>s.includes('Sent by Pi')));
     assert.doesNotMatch(await h.frame.locator('#rt').innerText(),/PRIVATE-GROUP|private-key/);
     await service.waitForFunction(()=>document.querySelectorAll('.rt-sky .pkt.held').length===3);
-    const fold=h.frame.locator('.rt-sub').first();await fold.focus();await h.page.keyboard.press('Enter');
+    const fold=h.frame.locator('.rt-accts > li.rt-sub').first();await fold.focus();await h.page.keyboard.press('Enter');
     assert.equal(await fold.getAttribute('aria-expanded'),'false');await h.page.keyboard.press('Space');
     assert.equal(await fold.getAttribute('aria-expanded'),'true');
     for(const width of [1600,560,390]){
@@ -602,13 +637,30 @@ await test(`${engineName}: copied native upper block through the production opaq
 
   await t.test('long native labels and four-source admission fit the actual inner scroller', async t => {
     const fixture = nativeTrace({ sessions: Array.from({ length: 6 }, (_, i) => `session-${i}-${'x'.repeat(80)}`) });
-    for (const r of fixture.routes) { r.model = 'long-requested-model-'.repeat(12); for (const s of r.order) s.model = r.model; for (const tr of r.tries) tr.model = r.model; }
+    for (let i = 0; i < 24; i++) fixture.routes.push({ ...structuredClone(fixture.routes[5]), id: i + 7, seq: i + 7 });
+    fixture.ids = fixture.routes.map(r => r.id); fixture.seq = 30;
+    for (const r of fixture.routes) {
+      r.sub = `private-long-list-actor-${r.id}`;
+      r.model = 'long-requested-model-'.repeat(12);
+      for (const s of r.order) s.model = r.model;
+      for (const tr of r.tries) tr.model = r.model;
+    }
     const harness = await browserHarness({ fixture }); t.after(() => harness.close());
     for (const [name, viewport] of [['desktop', { width: 1280, height: 900 }], ['mobile', { width: 390, height: 844 }]]) {
       const h = await contextFor(browser, harness, viewport);
       try {
         const service = await readyStage(h.page, h.frame);
         assert.equal(await h.frame.locator('.rt-src').count(), 4);
+        const dense = h.frame.locator('.rt-src').filter({ has: h.frame.locator(':scope > small', { hasText: 'session-5-' }) });
+        assert.equal(await dense.locator('.rt-actor').count(), 25, 'long lists retain all observed actors');
+        assert.equal(await dense.locator('.rt-actors').evaluate(n => getComputedStyle(n).touchAction), 'pan-y');
+        await dense.locator('.rt-actors').focus(); await h.page.keyboard.press('End');
+        await waitUntil(() => dense.locator('.rt-actors').evaluate(n => n.scrollTop > 0), 'long activity list scrolls to remaining entries');
+        assert.equal(await dense.locator('.rt-actor code.mdl').first().getAttribute('title'), fixture.routes[5].model, 'truncated model remains available in full');
+        if (name === 'mobile') {
+          await dense.locator('summary').tap(); assert.equal(await dense.locator('details').getAttribute('open'), null);
+          await dense.locator('summary').tap(); assert.notEqual(await dense.locator('details').getAttribute('open'), null);
+        }
         for (const dark of [false, true]) {
           await h.page.evaluate(v => window.testTheme(v), dark);
           await service.waitForFunction(theme => document.documentElement.dataset.theme === theme, dark ? 'dark' : 'light');
