@@ -1,11 +1,11 @@
 {
   "revision": "3f53fa1f316330b77e5ff6d065a7a56980cafda2",
   "generator": "scripts/vendor-native-routing.mjs",
-  "generatorSha256": "320e279a5163a2611977286a8ff6c1d1151afeeadb97841b1584953b449a8c1c",
+  "generatorSha256": "daf33229d4bb56af67ad2073e8fd83f9c24cf94dd1eb73308e92c775c05a2a45",
   "lifecycle": "ui/native-lifecycle.inc.js",
   "lifecycleSha256": "acf0b646179d916bbf8e758c8f82321f678c9dbd9c70c13fbdd094f42f697f18",
   "baselineSha256": "1dc45c97e12665fe03fa3fe56e8fc63ad3feb2e305526d626d12526d40564383",
-  "sessionSha256": "8387a66ded38de1c0bc4625f7419ee3111ced49928e94e4bf21d85c5363c167a",
+  "sessionSha256": "a963dc6ed40e323bbf4458ff041d7c187f9ee098f8ceadcd818402588deb3ad5",
   "sessionPatch": "source-grouping-patch.json",
   "sourceRanges": [
     [
@@ -160,7 +160,7 @@
     },
     {
       "location": "source child activity / ui/style.css",
-      "difference": "Plugin-owned flat activity boxes inside the exact session source summarize all retained source-local active/recent requests by opaque actor, with one unknown-actor request bucket. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. Collapsible keyboard/touch scroll exposes all retained entries; no added actor cap. Only this extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English."
+      "difference": "Source-local child rows copy the pinned native nested-group presentation (routing.css lines 71-107), with depth-1 indentation, concrete observed models and request-only states. Opaque actor keys remain internal: no displayed IDs or numbering; one unknown-actor activity aggregate. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. A list-wide disclosure and keyboard/touch scroll expose all retained entries; no added actor cap. Only this scoped extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English."
     },
     {
       "location": "gateway subtitle / clock",

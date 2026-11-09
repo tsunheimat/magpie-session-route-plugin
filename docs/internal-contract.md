@@ -1,6 +1,6 @@
 # Internal implementation contract
 
-Integration contract for API version 1. No raw gateway JSON crosses the API. Missing measurements are null or absent according to the endpoint's schema; unknown is never synthesized as zero. This contract includes the v0.3.1 project/actor/provider display corrections; see [validation](validation.md) for verification evidence and remaining limitations.
+Integration contract for API version 1. No raw gateway JSON crosses the API. Missing measurements are null or absent according to the endpoint's schema; unknown is never synthesized as zero. This contract includes the v0.3.1 project/actor/provider display corrections and v0.3.2 source-local nested-row presentation; see [validation](validation.md) for verification evidence and remaining limitations.
 
 ## Normalized records
 
@@ -63,7 +63,7 @@ Public fixed UI assets, `/healthz` and ownership nonce endpoint only carry non-s
 
 ## Frontend
 
-The v0.3.1 frontend retains the pinned native upper Routing source, CSS, translations, helpers and artwork introduced in v0.3.0. A deterministic extraction excludes lower Requests/Groups/provider editors, body/context viewers and mutation/navigation side effects; the reviewed source patch provides session identity, project labels and flat actor-activity boxes. Actor boxes are presentation only; request flights retain the original session source endpoints. Original-to-extraction parity and extraction-to-session-patch parity are separate checks. See the extraction manifests and [provenance](native-copy-provenance.md) for the exact boundaries and data/privacy adaptations.
+The frontend retains the pinned native upper Routing source, CSS, translations, helpers and artwork introduced in v0.3.0. A deterministic extraction excludes lower Requests/Groups/provider editors, body/context viewers and mutation/navigation side effects; the source patch provides session identity, project labels and source-local sub-agent activity. The v0.3.2 presentation correction replaces v0.3.1's actor-ID boxes with depth-1 native nested-group rows. Actor keys stay in the source-local JavaScript maps, not child DOM attributes, labels or tooltips. Rows show concrete observed served/requested models from active requests, or retained ended requests when none remain active; routing-group handles and missing-model substitutions are not observed models. Unknown actor evidence stays one aggregate. Request-state text never claims task completion. Request flights retain the original session source endpoints. Original-to-extraction parity, extraction-to-session-patch parity and nested-row styling comparisons are separate checks. See the extraction manifests and [provenance](native-copy-provenance.md) for the exact boundaries and data/privacy adaptations.
 
 UI uses classic local scripts and fixed relative service assets. The small parent bridge sends `{magpie:1,id,method,params}`; source-checks `event.source===parent`; and receives `{magpie:1,id,result|error}`. Launcher setup uses plugin options writes only. The service reacquires options/theme/visibility, never re-resolves launcher's `hello.service`, and keeps credentials only in memory and API Authorization. Its native registration/translation interface is separate from the parent bridge.
 

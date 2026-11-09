@@ -1,13 +1,22 @@
-/* The pinned native palettes, typography, stage geometry and motion are
-   unmodified. Plugin-owned addition: flat source-local sub-agent ACTIVITY only
-   (see generated extraction-manifest.json); never extra source/wire endpoints. */
-.rt-src > .rt-activity { width: 100%; min-width: 0; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; text-align: left; }
-.rt-activity > summary { cursor: pointer; overflow-wrap: anywhere; }
-.rt-activity > summary:focus-visible, .rt-activity > .rt-actors:focus-visible { outline: 2px solid var(--fg-2); outline-offset: 2px; }
-.rt-activity > .rt-actors { list-style: none; display: grid; gap: 4px; margin: 5px 0 0; padding: 0; max-height: 180px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
-.rt-actors > .rt-actor { min-width: 0; padding: 4px 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--card-2); overflow-wrap: anywhere; }
-.rt-actors > .rt-actor.active { border-color: var(--fg-2); }
-.rt-actor > .rt-actor-label { display: block; color: var(--fg-2); font-weight: 560; }
-.rt-actor > .rt-actor-count { display: block; font-variant-numeric: tabular-nums; }
-.rt-activity > .rt-activity-overflow { display: block; margin-top: 4px; overflow-wrap: anywhere; }
+/* Source-only adaptation of the pinned native nested-group rows:
+   upstream/plugins/routing/routing.css:71-107,109. Keep vendor CSS unchanged;
+   these children never participate in destination layout or wire ownership. */
+.rt-src > .rt-activity { width: 100%; min-width: 0; margin-top: 5px; color: var(--muted); font-size: 12px; text-align: start; }
+.rt-activity > summary { display: flex; align-items: center; gap: 7px; list-style: none; cursor: pointer; user-select: none; }
+.rt-activity > summary::-webkit-details-marker { display: none; }
+.rt-activity > summary .chev { display: inline-flex; color: var(--muted); transition: transform .2s; }
+.rt-activity > summary:hover .chev { color: var(--fg); }
+.rt-activity[open] > summary .chev { transform: rotate(180deg); }
+.rt-activity > summary:focus, .rt-activity > .rt-actors:focus { outline: none; }
+.rt-activity > summary:focus-visible, .rt-activity > .rt-actors:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+.rt-activity > .rt-actors { list-style: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; min-width: 0; margin: 5px 0 0; padding: 0; max-height: 180px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.rt-actors > .rt-actor { position: relative; min-width: 0; margin-left: calc(var(--depth, 0) * 18px); display: flex; align-items: center; flex-wrap: wrap; gap: 7px; row-gap: 4px; padding: 5px 10px; font-size: 12px; color: var(--muted); background: var(--card-2); border: 1px dashed var(--line); border-radius: 10px; transition: opacity .3s, border-color .3s, transform .5s cubic-bezier(.2, .8, .2, 1); }
+.rt-actors > .rt-actor.on { border-style: solid; border-color: var(--fg-2); color: var(--fg); }
+.rt-actor > svg { flex: none; color: var(--fg-2); }
+.rt-actor > b.rt-actor-label { font-size: inherit; font-weight: 560; color: var(--fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rt-actor > b.rt-actor-label::before { content: none; }
+.rt-actor > .rt-actor-models { display: flex; flex-wrap: wrap; gap: 7px; min-width: 0; max-width: 100%; }
+.rt-actor .mdl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rt-actor > i.rt-actor-state { margin-left: auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-style: normal; font-size: 10.5px; font-weight: 560; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--fg-2); white-space: nowrap; }
+.rt-activity > .rt-activity-overflow { display: block; margin-top: 4px; font-size: 11px; overflow-wrap: anywhere; }
 .rt-activity > .rt-activity-overflow:empty { display: none; }

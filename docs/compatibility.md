@@ -1,6 +1,6 @@
 # Compatibility
 
-**v0.3.1: project/sub-agent/provider display corrections.** The pinned native source and deployment floor are unchanged. Current verification passes 183 unit/API tests plus separate browser fixtures, 19 service tests and 13 comparison tests per engine, and 14 contained Magpie/Bun checks. Historical results for earlier releases remain separate. See [validation](validation.md) for current evidence and [provenance](native-copy-provenance.md) for deliberate source/data changes.
+**v0.3.2: native nested sub-agent rows.** The pinned native source and deployment floor are unchanged. This correction changes only source-local presentation, retaining v0.3.1's project/provider display improvements. Unit/API verification passes 187 tests plus a separately exercised browser fixture; protected-service suites pass 19 tests and native comparison suites pass 17 tests in each engine. See [validation](validation.md) for version-specific release and host-integration evidence and [provenance](native-copy-provenance.md) for deliberate source/data changes.
 
 ## Verified reference
 
@@ -46,7 +46,7 @@ Relevant source contracts were inspected under `internal/plugin/{host.js,host.go
 9. **No production agent-process test claim.** Integration uses deterministic loopback providers and synthetic native Claude/Codex headers, not real agent session files, provider credentials or paid model calls.
 10. **Native-copy privacy/read-only boundary.** Full provider inventory, raw rule/classifier narratives, body/context viewers and lower configuration editors are not exposed. Unsupported enabled-account counts/explanations are withheld rather than faked. Gateway totals are global since-start evidence, not session totals. Every extraction/hosting/data change is distinct from the source-grouping patch; copying the renderer alone does not establish complete visual/semantic parity.
 
-11. **Sub-agent boxes are observed activity, not ancestry.** The trace has `sub` and turn-specific `subagentId`, but no complete parent-agent chain. Flat child boxes stay inside their exact recorded session; title-helper `parentSession` never reparents workers. Kind-only/conflicting identities remain unknown activity. Original request flights remain session-level.
+11. **Sub-agent rows are observed activity, not ancestry.** The trace has `sub` and turn-specific `subagentId`, but no complete parent-agent chain. The v0.3.2 UI correction uses the original nested-group visual pattern at one indentation level inside the exact recorded session, without actor IDs or numbered substitutes. It does not create a recursive worker tree; title-helper `parentSession` never reparents workers. Kind-only/conflicting identities remain one unknown activity aggregate. Models and state describe observed requests, not task roles or task completion. Original request flights remain session-level.
 12. **Only bundled artwork is available.** Public native logos use the full local inventory rather than a guessed brand table. Uploaded `file:` images, remote URLs and unbundled artwork are not fetched; explicit unsupported artwork becomes generic instead of silently selecting another brand.
 
 ## Upgrade checklist
