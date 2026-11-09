@@ -197,11 +197,16 @@ try {
     const active = await until('collector live', () => api(), value => value.status === 200 && value.body.connection.status === 'live');
     assert.equal(active.body.requests.length, 0);
     const initialInstance = active.body.instanceId;
-    const send = (session, { model = 'good/m', agent = 'claude' } = {}) => {
+    const send = (session, { model = 'good/m', agent = 'claude', actor, workFolder } = {}) => {
       const headers = { 'Content-Type': 'application/json', 'User-Agent': agent === 'codex' ? 'codex_cli_rs/0.0.0' : 'claude-cli/0.0.0' };
       if (session) headers[agent === 'codex' ? 'session_id' : 'x-claude-code-session-id'] = session;
+      if (actor) headers['x-claude-code-agent-id'] = actor;
+      const messages = [
+        ...(workFolder ? [{ role: 'system', content: `Primary working directory: ${workFolder}` }] : []),
+        { role: 'user', content: 'synthetic-private-prompt' },
+      ];
       const promise = request(gateway + '/v1/chat/completions', { method: 'POST', headers,
-        signal: AbortSignal.timeout(60_000), body: JSON.stringify({ model, messages: [{ role: 'user', content: 'synthetic-private-prompt' }] }) });
+        signal: AbortSignal.timeout(60_000), body: JSON.stringify({ model, messages }) });
       pending.add(promise); promise.finally(() => pending.delete(promise)).catch(() => {});
       return promise;
     };
@@ -272,6 +277,25 @@ try {
     assert.equal(aHistory.status, 200); assert.equal(aHistory.body.metrics.requests, 2);
     assert.ok(aHistory.body.requests.every(route => route.agent === 'claude' && route.session === 'session-alpha'));
     record('actual usage ledger has source-labelled, isolated Today history');
+    phase = 'native project and worker display evidence';
+    held = true;
+    const workFolder = '/synthetic/private-parent/project-visible';
+    const worker = 'synthetic-worker-identity';
+    const displayCalls = [send('display-session', { workFolder }),
+      send('display-session', { workFolder, actor: worker }), send('display-session', { workFolder, actor: worker })];
+    const display = await until('native project/actor evidence', () => api('api/native-routing'), value =>
+      value.status === 200 && value.body.routes.filter(r => r.session === 'display-session').length === 3);
+    const displayRows = display.body.routes.filter(r => r.session === 'display-session');
+    assert(displayRows.every(r => r.projectName === 'project-visible' && r.folder === undefined));
+    assert(displayRows.every(r => r.order.some(s => s.name === 'Synthetic success')), 'recorded provider display name survives');
+    const workers = displayRows.filter(r => r.isSubagent);
+    assert.equal(workers.length, 2); assert(workers[0].actorId); assert.equal(workers[0].actorId, workers[1].actorId);
+    assert(workers.every(r => r.subagentId === undefined), 'tool-less helper identity is not promoted to a native turn tag');
+    const displayText = JSON.stringify(display.body);
+    assert(!displayText.includes(worker) && !displayText.includes('private-parent') && !displayText.includes('synthetic-private-prompt'));
+    held = false; for (const release of [...waiting]) release();
+    for (const response of await Promise.all(displayCalls)) assert.equal(response.status, 200);
+    record('native project basenames, recorded provider names and tool-less actor identity without private paths');
     phase = 'disable and noninterference';
     held = true;
     const uninterrupted = send('uninterrupted');

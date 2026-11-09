@@ -2,7 +2,7 @@
 
 A read-only plugin page that copies Magpie's **native upper Routing block**, changing client/source grouping to the exact **agent + recorded native session ID**. Different sessions of the same client have separate source nodes; concurrent requests in one session share one source and keep independent native flights. Right-hand account/provider/model rows remain shared. The original **Routing** page and **Routing Groups** editor are not replaced.
 
-**v0.3.0 — actual native upper-block copy:** this version replaces the custom v0.2.0 renderer with the copied native source. Existing `v0.1.0` and `v0.2.0` tags remain unchanged. Chromium/WebKit, source comparisons and contained Magpie/Bun checks pass. The session subtitle causes a small native desktop reflow; this is not a pixel-identical copy beyond the source label. See [validation](docs/validation.md) for measured differences and exact results rather than treating earlier release tests as proof of this version.
+**v0.3.1 — project names, sub-agent activity and native provider branding.** This version corrects v0.3.0's missing single-project labels and substituted provider names/icons, and adds flat sub-agent activity boxes inside their recorded session. The native renderer, shared destination identities and original session-level flights remain. Existing release tags are unchanged. See [validation](docs/validation.md) for version-specific evidence and remaining boundaries.
 
 The service runs **inside Magpie’s existing Bun plugin host**, listening only on `127.0.0.1`. No extra daemon/container, model calls, routing middleware or persistent traffic archive is added. The browser reaches it through Magpie’s authenticated plugin-page service proxy—not the browser’s localhost.
 
@@ -14,12 +14,12 @@ The package is named `magpie-session-routing` and is distributed through GitHub;
 
 ## Install in an existing Magpie installation
 
-The commands in this section select **v0.3.0**, the native-copy version. Use the local-directory method below to test a local checkout.
+The commands in this section select **v0.3.1**, including project/sub-agent/provider display corrections. Use the local-directory method below to test a local checkout.
 
 Run under the same account and configuration environment as Magpie:
 
 ```sh
-magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.0
+magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.1
 magpie plugin list
 ```
 
@@ -29,16 +29,16 @@ Run the CLI inside the **existing Magpie container**, not on the Kubernetes host
 
 ```sh
 kubectl exec -n <namespace> <magpie-pod> -c <magpie-container> -- \
-  magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.0
+  magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.1
 ```
 
 The official image keeps configuration and installed plugins under `/config`; persist that mount with your existing PVC. Leave the container's HOME/XDG environment unchanged. No extra pod, Service, Ingress rule, or exposed plugin port is needed. Refresh the WebUI after installation; a pod restart should normally be unnecessary. Then complete secure first-use setup below. This is a single-instance plugin, not a cross-replica collector.
 
-### Upgrade from v0.1.0 or v0.2.0
+### Upgrade from v0.1.0, v0.2.0 or v0.3.0
 
-Run the same `magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.0` command inside the existing Magpie container. These versions use the same package name `magpie-session-routing`, so Magpie replaces the existing entry and preserves its options and enabled/disabled state. **Do not remove the old entry first**—removal deletes its saved options. Close/reopen Session Routing after the upgrade; previously configured secure access is reused.
+Run the same `magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.1` command inside the existing Magpie container. These versions use the same package name `magpie-session-routing`, so Magpie replaces the existing entry and preserves its options and enabled/disabled state. **Do not remove the old entry first**—removal deletes its saved options. Close/reopen Session Routing after the upgrade; previously configured secure access is reused.
 
-`magpie plugin update` alone reinstalls a Git plugin's existing pinned spec; it does not change `#v0.1.0` or `#v0.2.0` to the new tag. If you previously installed from a local directory or have multiple entries, inspect `magpie plugin list` and use the appropriate installation path rather than creating another enabled instance.
+`magpie plugin update` alone reinstalls a Git plugin's existing pinned spec; it does not change `#v0.1.0`, `#v0.2.0` or `#v0.3.0` to the new tag. If you previously installed from a local directory or have multiple entries, inspect `magpie plugin list` and use the appropriate installation path rather than creating another enabled instance.
 
 ### Local directory or archive
 
@@ -80,9 +80,12 @@ Set options in Magpie’s plugin settings; preserve the saved credential pair wh
 | Option | Default | Meaning |
 |---|---|---|
 | `port` | `3496` | IPv4 loopback service port, 1–65535, distinct from the gateway port. Not a browser URL. |
-| `showFolders` | `false` | Explicitly allow project-folder metadata in responses/native source summaries. This can expose local paths. |
+| `showProjectNames` | `true` | Show only the final component of a recorded project folder in the native source label. Set false to withhold it. No repository/session-file lookup. |
+| `showFolders` | `false` | Separately allow the recorded folder value in responses/tooltips. This can expose parent path components; project-name display alone does not enable it. |
 | `installationId` | Unset | Generated per installation by first-use setup. Do not reuse across separate installs. |
 | `apiToken` | Unset | Generated 32-byte base64url bearer credential. Keep private. |
+
+**Display-privacy migration:** a missing `showProjectNames` option defaults to true, including installations upgraded from v0.3.0. This newly discloses a validated project basename, but not the rest of the recorded folder. Set `showProjectNames: false` to opt out; leave `showFolders: false` to withhold folder paths. The plugin does not rewrite saved options or credentials. Changing either option invalidates the old service's authorization and projection.
 
 A CLI host can receive a temporary service port from Magpie. It must not become a second collector. Overlapping regular hosts perform an authenticated ownership check and wait for the existing owner to release the port; old Magpie hosts can drain for ten minutes. An unrecognized owner permits only a short, bounded exclusive-bind retry so a revoked old host can close during credential rotation; it is never trusted as a compatible owner. Unknown port owners are not killed, probed with a bearer token, or silently replaced by another port. Configure an unused port if the conflict remains.
 
@@ -91,11 +94,13 @@ A CLI host can receive a temporary service port from Magpie. It must not become 
 This is the actual copied native upper block, not a newly drawn equivalent. There is **no new session dropdown, per-request source card, custom Details drawer or six-request/twelve-destination limit**.
 
 - **Session sources:** `(agent, recorded session)` is exact and case-sensitive. Claude Code/session A and Claude Code/session B get separate native source nodes. Two requests in session A share one node but keep independent native request flights. Codex/session A remains separate from Claude Code/session A. The original client icon/name/color remain; the existing subtitle shows a shortened session discriminator.
+- **Projects:** a recorded project basename appears even for a session with only one project, followed by the short session discriminator. Model and full session ID remain in the native tooltip. Missing evidence is not guessed, and equal project names do not merge sessions.
+- **Sub-agent activity:** small boxes inside a session show observed actors and their active gateway requests. Repeated requests by one actor share its box; known workers from different sessions remain distinct. Kind-only or conflicting identity evidence is explicitly unknown actor activity, not an invented worker count. The boxes are flat, not a recursive agent tree: trace does not expose a complete parent-agent chain, and `parentSession` is title-helper metadata. Flights still use the session's native source wire/origin. Independent recorded child sessions remain separate sources. No activity means no observed in-flight request, not that a worker's whole task finished.
 - **Identity boundaries:** model/provider/folder changes do not split a known session; parent/child metadata does not merge recorded sessions. Missing or invalid session identities are labelled unknown and isolated per stable request, never assigned to a known session. This page cannot recover a header that Magpie already overrode or truncated.
 - **Destinations:** the original account/provider/model rows, reconciliation, folds and wires are retained. Safe account handles are shared across requests and sessions, so the same observed seat stays one native destination rather than becoming a new row per request.
 - **Native limits and motion:** the copied staging policy admits at most four source identities. The separate native `LIVE = 4` startup/resume request cap is also unchanged. Requests remain independently keyed inside the native flight/replay engine; this is not a claim that every concurrent request always has a visible animation. Original curves, bird artwork and animation algorithms are retained, with a hosting lifecycle that pauses on hidden/stale/disconnected views and clears obsolete state after a backend reset or authorization failure.
 - **Native upper interactions:** retained replay, focus, mask and account-fold behavior changes presentation only; replay never sends a model request. Lower Requests/Groups/provider editors, raw body/context viewers and configuration writes are outside this page. Settings links into excluded editors must not appear to perform a supported edit.
-- **Evidence boundaries:** the feed contains recent retained trace evidence, not full provider inventory. Account/provider/group names are privacy-safe labels; masks cannot disclose withheld original names. Available quota/rest/attempt evidence is preserved, but unknown values and withheld explanation details must remain unavailable. In particular, candidate count cannot justify the native sentence that only one configured account is enabled.
+- **Evidence boundaries:** the feed contains recent retained trace evidence, not full provider inventory. Safe recorded provider display names and their bundled native icons are preserved; account/key/group identities remain neutral labels, and masks cannot disclose originals. Unsafe provider names fall back to neutral labels. Arbitrary uploaded (`file:`), remote or unbundled artwork remains unsupported and uses a generic icon rather than another guessed brand. Available quota/rest/attempt evidence is preserved, but unknown values and withheld explanation details must remain unavailable. In particular, candidate count cannot justify the native sentence that only one configured account is enabled.
 - **Counters:** native gateway totals describe the gateway since its start, not the visible sessions. Missing counters are unavailable, not zero. The legacy scoped metrics/history APIs are retained separately; a period selector or history list is not added to this upper block.
 - **Shared service:** each frame reads the cached safe native feed. Multiple viewers still share one gateway collector. Hidden frames pause; authorization failures clear sensitive presentation and re-read options without rotating credentials.
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer as httpServer, request } from 'node:http';
 import { createServer as tcpServer } from 'node:net';
 import { randomBytes } from 'node:crypto';
-import { mkdtemp, writeFile, rename, rm, mkdir } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rename, rm, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -101,13 +101,15 @@ function stubs(overrides = {}) {
 function own(t, handle) { cleanup(t, () => handle.stop()); return handle; }
 
 test('options validate independent canonical secrets and local gateway addresses', () => {
-  assert.deepEqual(validateOptions(), { port: 3496, showFolders: false, installationId: undefined, apiToken: undefined, provisioned: false });
+  assert.deepEqual(validateOptions(), { port: 3496, showFolders: false, showProjectNames: true, installationId: undefined, apiToken: undefined, provisioned: false });
   const pair = credentials();
-  const options = validateOptions({ ...pair, port: '3497', showFolders: true });
+  const options = validateOptions({ ...pair, port: '3497', showFolders: true, showProjectNames: false });
+  assert.equal(options.showProjectNames, false);
+  assert.equal(options.showFolders, true);
   assert.equal(options.port, 3497);
   assert.equal(options.provisioned, true);
   for (const bad of [null, [], { unknown: true }, { port: 0 }, { port: 65536 }, { port: 1.5 },
-    { port: '03496' }, { showFolders: 'yes' }, { installationId: pair.installationId }, { apiToken: pair.apiToken },
+    { port: '03496' }, { showFolders: 'yes' }, { showProjectNames: 'yes' }, { showProjectNames: null }, { showProjectNames: 0 }, { installationId: pair.installationId }, { apiToken: pair.apiToken },
     { ...pair, apiToken: pair.apiToken + '=' }, { ...pair, installationId: pair.apiToken },
     { ...pair, apiToken: pair.installationId }, { ...pair, apiToken: 'not-a-token' }]) {
     assert.throws(() => validateOptions(bad), ConfigurationError);
@@ -139,6 +141,7 @@ test('saved configuration authorization is fail-closed and never uses last-good 
     { plugins: [{ ...fx.entry, options: { ...fx.options, installationId: credentials().installationId } }] },
     { plugins: [{ ...fx.entry, options: { ...fx.options, port: fx.options.port === 65535 ? 65534 : fx.options.port + 1 } }] },
     { plugins: [{ ...fx.entry, options: { ...fx.options, showFolders: true } }] },
+    { plugins: [{ ...fx.entry, options: { ...fx.options, showProjectNames: false } }] },
     ' '.repeat(1024 * 1024 + 1)]) {
     await fx.write(value);
     assert.equal(await authorize(), false);
@@ -234,6 +237,7 @@ test('disable, removal, token/ID/port changes, malformed files and privacy chang
     (fx) => ({ plugins: [{ ...fx.entry, options: { ...fx.options, apiToken: credentials().apiToken } }] }),
     (fx) => ({ plugins: [{ ...fx.entry, options: { ...fx.options, installationId: credentials().installationId } }] }),
     (fx) => ({ plugins: [{ ...fx.entry, options: { ...fx.options, showFolders: true } }] }),
+    (fx) => ({ plugins: [{ ...fx.entry, options: { ...fx.options, showProjectNames: false } }] }),
     (fx) => ({ plugins: [{ ...fx.entry, options: { ...fx.options, port: fx.options.port === 65535 ? 65534 : fx.options.port + 1 } }] }),
     () => '{',
   ];
@@ -336,7 +340,7 @@ test('occupied foreign port is never sent bearer data, taken over or terminated'
 });
 
 test('rotation permits a short exclusive-bind retry while an unrecognized old owner self-revokes', async (t) => {
-  for (const change of [{ apiToken: credentials().apiToken }, { showFolders: true }]) {
+  for (const change of [{ apiToken: credentials().apiToken }, { showFolders: true }, { showProjectNames: false }]) {
     const fx = await fixture(t);
     const join = deferred();
     let revoking = false;
@@ -658,6 +662,48 @@ test('same-process canonical port change joins the old owner before constructing
   assert.equal((await call(nextOptions.port, '/api/state', { Authorization: `Bearer ${nextOptions.apiToken}` })).status, 200);
   assert.equal(nextStub.counters.starts, 1);
   assert.equal(remapped.counters.starts, 0);
+});
+
+test('project disclosure defaults and opt-out are passed through without rewriting saved settings', async t => {
+  for (const options of [{}, { showProjectNames: false }, { showProjectNames: true, showFolders: true }]) {
+    const fx = await fixture(t, { options });
+    const before = await readFile(fx.file, 'utf8');
+    let passed;
+    const stub = stubs({ createAggregator: value => { passed = value; return stub.aggregator; } });
+    const handle = own(t, await startService(fx.input, fx.options, stub.deps));
+    assert.deepEqual(passed, { showFolders: options.showFolders ?? false, showProjectNames: options.showProjectNames ?? true });
+    assert.equal(await readFile(fx.file, 'utf8'), before);
+    await handle.stop();
+    assert.equal(await readFile(fx.file, 'utf8'), before);
+  }
+});
+
+test('same-process project disclosure changes replace the service and join the old collector', async t => {
+  const fx = await fixture(t);
+  const oldStub = stubs({ watchdogMs: 60_000 });
+  const first = own(t, await startService(fx.input, fx.options, oldStub.deps));
+  assert.equal(await startService(fx.input, { ...fx.options, showProjectNames: true }, oldStub.deps), first,
+    'default and explicit true have the same effective fingerprint');
+  const optedOut = { ...fx.options, showProjectNames: false };
+  await fx.write({ plugins: [{ ...fx.entry, options: optedOut }] });
+  const saved = await readFile(fx.file, 'utf8');
+  let passed;
+  const nextStub = stubs({ createAggregator: options => {
+    assert.equal(oldStub.counters.stops, 1);
+    assert.equal(oldStub.counters.clears, 1);
+    passed = options;
+    return nextStub.aggregator;
+  } });
+  const next = own(t, await startService(fx.input, optedOut, nextStub.deps));
+  assert.notEqual(next, first);
+  assert.equal(first.status, 'stopped');
+  assert.equal(first.address(), null);
+  assert.equal(next.status, 'serving');
+  assert.deepEqual(passed, { showFolders: false, showProjectNames: false });
+  assert.equal(await readFile(fx.file, 'utf8'), saved);
+  // Removing an explicit false re-enables the default and revokes its projection.
+  await fx.write({ plugins: [fx.entry] });
+  await eventually(() => next.status === 'revoked');
 });
 
 test('same-process credential rotation joins old collector before new startup', async (t) => {

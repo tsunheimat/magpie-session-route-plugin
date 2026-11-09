@@ -1,11 +1,11 @@
 {
   "revision": "3f53fa1f316330b77e5ff6d065a7a56980cafda2",
   "generator": "scripts/vendor-native-routing.mjs",
-  "generatorSha256": "f460a130c413a51c98c4d99e177c67cb80296b537d49d93ff47e6fb4222120b1",
+  "generatorSha256": "320e279a5163a2611977286a8ff6c1d1151afeeadb97841b1584953b449a8c1c",
   "lifecycle": "ui/native-lifecycle.inc.js",
   "lifecycleSha256": "acf0b646179d916bbf8e758c8f82321f678c9dbd9c70c13fbdd094f42f697f18",
   "baselineSha256": "1dc45c97e12665fe03fa3fe56e8fc63ad3feb2e305526d626d12526d40564383",
-  "sessionSha256": "0b96864bc0f6718a99a18e6d7f2ac77efa163febb032e3e3852665cf346ccff0",
+  "sessionSha256": "8387a66ded38de1c0bc4625f7419ee3111ced49928e94e4bf21d85c5363c167a",
   "sessionPatch": "source-grouping-patch.json",
   "sourceRanges": [
     [
@@ -152,11 +152,15 @@
     },
     {
       "location": "group / provider headings",
-      "difference": "Recorded sanitized group metadata is retained; private group/provider labels are neutral and settings navigation is removed, not stubbed."
+      "difference": "Recorded safe provider names and bundled icon/preset metadata retain native precedence; unavailable or unsupported metadata uses neutral/generic fallback. Private group/account identities remain opaque and settings navigation is removed, not stubbed."
     },
     {
       "location": "source names / model subtitles",
-      "difference": "Pinned built-in client labels/icons replace installed-client inventory. Private session titles and original headers are not read. Effective recorded session only; folder metadata is opt-in."
+      "difference": "Pinned built-in client labels/icons replace installed-client inventory. A separately disclosed project basename precedes the short session, including a single project; model and full session remain in the tooltip. No folder-to-project inference. Full folder metadata is separately opt-in."
+    },
+    {
+      "location": "source child activity / ui/style.css",
+      "difference": "Plugin-owned flat activity boxes inside the exact session source summarize all retained source-local active/recent requests by opaque actor, with one unknown-actor request bucket. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. Collapsible keyboard/touch scroll exposes all retained entries; no added actor cap. Only this extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English."
     },
     {
       "location": "gateway subtitle / clock",

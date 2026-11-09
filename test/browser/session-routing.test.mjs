@@ -109,7 +109,18 @@ function observeNative() {
       if (!record) { record = { node: this, first: null, last: null, samples: 0 }; tracked.set(this, record); window.flightRecords.push(record); }
       const point = new DOMPoint(Number(this.getAttribute('cx')), Number(value)).matrixTransform(this.getScreenCTM());
       const near = [...document.querySelectorAll('.rt-src')].map(n => {
-        const b = n.getBoundingClientRect(); return { title: n.title, dx: point.x - b.right, dy: point.y - (b.y + b.height / 2) };
+        const b = n.getBoundingClientRect(), transform = new DOMMatrix(getComputedStyle(n).transform);
+        // Native rttick scales a card around its center; wires retain the
+        // unscaled layout attachment while this decorative pulse runs.
+        const x = b.x + b.width / 2 + b.width / Math.hypot(transform.a, transform.b) / 2;
+        const y = b.y + b.height / 2;
+        const wires = [...document.querySelectorAll('.rt-wires path')].filter(w => w.getAttribute('d')).map(w => {
+          const ctm = w.getScreenCTM(), start = w.getPointAtLength(0), atSix = w.getPointAtLength(6);
+          const a = new DOMPoint(start.x, start.y).matrixTransform(ctm);
+          const end = new DOMPoint(atSix.x, atSix.y).matrixTransform(ctm);
+          return { startError: Math.hypot(a.x - x, a.y - y), sampleError: Math.hypot(end.x - point.x, end.y - point.y) };
+        }).sort((a,b) => a.startError - b.startError);
+        return { title: n.title, dx: point.x - b.right, dy: point.y - y, wire: wires[0] };
       }).sort((a,b) => Math.hypot(a.dx,a.dy)-Math.hypot(b.dx,b.dy))[0];
       const sample = { x: point.x, y: point.y, near, back: this.classList.contains('back') };
       record.first ||= sample; record.last = sample; record.samples++;
@@ -123,7 +134,8 @@ async function completedFlights(service) {
 function assertHome(flight, session) {
   for (const point of [flight.first, flight.last]) {
     assert(point.near.title.includes(`Session id: ${session}`), JSON.stringify(flight));
-    assert(Math.abs(point.near.dy) < 2 && point.near.dx >= 4 && point.near.dx <= 8, `native 6px source edge: ${JSON.stringify(flight)}`);
+    assert(point.near.wire?.startError < 1, `native session wire attaches at source right-center: ${JSON.stringify(flight)}`);
+    assert(point.near.wire.sampleError < 1, `native packet is six path-length pixels from its source: ${JSON.stringify(flight)}`);
   }
   assert.equal(flight.first.back, false, JSON.stringify(flight)); assert.equal(flight.last.back, true, JSON.stringify(flight));
 }
@@ -277,8 +289,8 @@ await test(`${engineName}: copied native upper block through the production opaq
     fixture.routes.forEach((r, i) => { r.folder = ['workspace/magpie', 'src/engine', 'src/dial'][i]; r.parentSession = 'shared-parent'; });
     const harness = await browserHarness({ fixture, showFolders: true }); t.after(() => harness.close());
     const h = await contextFor(browser, harness); t.after(() => h.context.close()); const service = await readyStage(h.page, h.frame);
-    const a = h.frame.locator('.rt-src').filter({ has: h.frame.locator('small', { hasText: /^alpha ·/ }) });
-    const b = h.frame.locator('.rt-src').filter({ has: h.frame.locator('small', { hasText: /^bravo ·/ }) });
+    const a = h.frame.locator('.rt-src').filter({ hasText: 'alpha' });
+    const b = h.frame.locator('.rt-src').filter({ hasText: 'bravo' });
     assert.match(await a.getAttribute('title'), /Folder: workspace\/magpie\nFolder: src\/engine/);
     assert.doesNotMatch(await a.getAttribute('title'), /dial/);
     assert.match(await b.getAttribute('title'), /Folder: src\/dial/);
@@ -291,6 +303,123 @@ await test(`${engineName}: copied native upper block through the production opaq
     assert.equal(await service.evaluate(() => folderNodes.every(n => n.isConnected)), true);
     assert.equal(await h.frame.locator('.rt-src').count(), 2);
     assert.match(await a.getAttribute('title'), /Folder: new\/module/); assert.doesNotMatch(await b.getAttribute('title'), /module/);
+    noErrors(h);
+  });
+
+  await t.test('raw provider display metadata reaches native headings and artwork without brand substitution', async t => {
+    const variants = [
+      { provider: 'gemini', name: 'Gemini CLI', icon: 'geminicli-color', expected: 'geminicli-color' },
+      { provider: 'custom-antigravity', name: 'Antigravity', icon: 'antigravity-color', expected: 'antigravity-color' },
+      { provider: 'kiro', name: 'Kiro', icon: 'kiro-color', expected: 'kiro-color' },
+      { provider: 'custom-stepfun', name: 'StepFun', icon: 'stepfun-color', expected: 'stepfun-color' },
+      { provider: 'openai', name: '研發備援 (EU) & Gateway', icon: 'anthropic', preset: 'openai', expected: 'anthropic' },
+      { provider: 'custom-preset', name: 'Preset fallback', preset: 'geminicli-color', expected: 'geminicli-color' },
+      { provider: 'custom-upload', name: 'Uploaded artwork unavailable', icon: 'file:private-picture', preset: 'geminicli-color', expected: 'generic' },
+      { provider: 'custom-remote', name: 'Remote artwork unavailable', icon: 'https://secret.invalid/image.svg', preset: 'openai', expected: 'generic' },
+    ];
+    const fixture = nativeTrace({ sessions: ['branding-session'] });
+    function applyBrand(v) {
+      const r = fixture.routes[0], s = r.order[0];
+      r.provider = v.provider; r.order = [{ ...s, id: `${v.provider}@fixture-private-account`, provider: v.provider, kind: 'provider', name: v.name, icon: v.icon, preset: v.preset }];
+      r.tries[0].id = r.order[0].id;
+    }
+    applyBrand(variants[0]);
+    const harness = await browserHarness({ fixture }); t.after(() => harness.close());
+    const h = await contextFor(browser, harness); t.after(() => h.context.close());
+    const service = await readyStage(h.page, h.frame);
+    for (const [index, v] of variants.entries()) {
+      if (index) { applyBrand(v); update(harness, fixture); }
+      await service.waitForFunction(name => document.querySelector('.rt-accts')?.textContent.includes(name), v.name);
+      assert((await h.frame.locator('.rt-what').innerText()).includes(v.name), 'native provider heading uses the recorded display name');
+      assert.equal(await h.frame.locator('.rt-accts .ic').first().getAttribute('data-icon'), v.expected);
+      if (v.expected !== 'generic') {
+        await waitUntil(() => harness.observations.some(r => r.path === `vendor/magpie/icons/${v.expected}.svg`), 'the actual pinned provider artwork is requested');
+      }
+      assert.doesNotMatch(await h.frame.locator('#rt').innerText(), /DO-NOT-EXPOSE|fixture-private-account|private-picture|secret\.invalid/);
+    }
+    const rawSeat = fixture.routes[0].order[0];
+    rawSeat.name = 'sk-proj-credentialcanary0123456789'; update(harness, fixture);
+    await service.waitForFunction(() => document.querySelector('.rt-what')?.textContent.startsWith('Provider '));
+    assert.doesNotMatch(await h.frame.locator('#rt').innerText(), /credentialcanary/);
+    assert.equal(await h.frame.locator('.rt-src').count(), 1);
+    assert.equal(await h.frame.locator('.rt-accts > li').count(), 1);
+    noErrors(h);
+  });
+
+  await t.test('one recorded project is visible without disclosing its parent path', async t => {
+    const fixture = nativeTrace({ sessions: ['alpha', 'bravo'] });
+    fixture.routes[0].folder = 'private-parent/same-project';
+    fixture.routes[1].folder = 'C:\\private-parent\\same-project';
+    const harness = await browserHarness({ fixture }); t.after(() => harness.close());
+    const h = await contextFor(browser, harness); t.after(() => h.context.close());
+    const service = await readyStage(h.page, h.frame);
+    const subtitles = await h.frame.locator('.rt-src > small').allTextContents();
+    assert.equal(subtitles.length, 2);
+    assert(subtitles.every(text => text.includes('same-project')));
+    assert(subtitles.some(text => text.includes('alpha')) && subtitles.some(text => text.includes('bravo')));
+    assert.doesNotMatch(JSON.stringify(harness.aggregator.nativeSnapshot()), /private-parent|C:/);
+    assert.doesNotMatch(await h.frame.locator('#rt').innerText(), /private-parent/);
+    assert((await sourceTitles(h.frame)).every(title => !title.includes('Folder:')));
+    await noOverflow(service, 'visible single-project labels');
+    await capture(h.page, h.frame, 'project-names'); noErrors(h);
+
+    const hidden = await browserHarness({ fixture, showProjectNames: false }); t.after(() => hidden.close());
+    const other = await contextFor(browser, hidden); t.after(() => other.context.close());
+    await readyStage(other.page, other.frame);
+    assert.doesNotMatch(await other.frame.locator('#rt').innerText(), /same-project|private-parent/);
+    assert.doesNotMatch(JSON.stringify(hidden.aggregator.nativeSnapshot()), /same-project|private-parent/);
+    noErrors(other);
+  });
+
+  await t.test('source-local sub-agent boxes show observed requests without changing flight endpoints or source caps', async t => {
+    const fixture = nativeTrace({ sessions: ['alpha', 'alpha', 'alpha', 'alpha', 'bravo'] });
+    const [main, first, helper, unknown, independent] = fixture.routes;
+    main.folder = 'private-parent/project-alpha';
+    first.subagentId = first.sub = 'private-actor-one'; helper.sub = 'private-actor-one';
+    unknown.kind = 'collab_spawn'; independent.sub = 'private-actor-one'; independent.parentSession = 'alpha';
+    const harness = await browserHarness({ fixture }); t.after(() => harness.close());
+    const h = await contextFor(browser, harness, { width: 1280, height: 1000 }, 'no-preference', observeNative);
+    t.after(() => h.context.close()); const service = await readyStage(h.page, h.frame);
+    const alpha = h.frame.locator('.rt-src[title*="Session id: alpha"]');
+    const bravo = h.frame.locator('.rt-src[title*="Session id: bravo"]');
+    await service.waitForFunction(() => document.querySelectorAll('.rt-actor').length === 3);
+    assert.equal(await h.frame.locator('.rt-src').count(), 2);
+    assert.equal(await alpha.locator('.rt-actor').count(), 2);
+    assert.equal(await bravo.locator('.rt-actor').count(), 1, 'independent recorded session is not reparented');
+    assert.match(await alpha.locator('.rt-actor[data-actor-id]:not([data-actor-id=""]) .rt-actor-count').innerText(), /Active gateway requests: 2/);
+    assert.match(await alpha.locator('.rt-actor[data-actor-id=""]').innerText(), /actor unavailable/);
+    assert.match(await alpha.locator('summary').getAttribute('aria-label'), /1 identified actors; 1 requests with actor unavailable; 3 active gateway requests/);
+    assert.doesNotMatch(await h.frame.locator('#rt').innerText(), /private-actor|private-parent/);
+    await service.waitForFunction(() => document.querySelectorAll('.rt-sky .pkt.held').length === 4);
+    assert.equal(await h.frame.locator('.rt-src .rt-src').count(), 0, 'activity boxes are not extra native sources');
+    assert.equal(await h.frame.locator('.rt-accts > li').count(), 2, 'same original account seats remain shared');
+    await service.evaluate(() => { window.actorNodes = [...document.querySelectorAll('.rt-actor')]; });
+    const before = reads(harness); await waitUntil(() => reads(harness) >= before + 3, 'unchanged actor polls complete');
+    assert.equal(await service.evaluate(() => actorNodes.every(n => n.isConnected)), true);
+    await alpha.locator('summary').focus(); await h.page.keyboard.press('Enter');
+    assert.equal(await alpha.locator('details').getAttribute('open'), null);
+    await h.page.keyboard.press('Enter');
+    assert.notEqual(await alpha.locator('details').getAttribute('open'), null);
+    await noOverflow(service, 'sub-agent activity desktop');
+    await capture(h.page, h.frame, 'project-subagents');
+    await h.page.setViewportSize({ width: 390, height: 1000 });
+    await service.waitForFunction(() => document.querySelector('#rt').classList.contains('max560'));
+    await h.page.evaluate(() => window.testTheme(true));
+    await service.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+    await noOverflow(service, 'sub-agent activity mobile dark');
+    await capture(h.page, h.frame, 'project-subagents-mobile-dark');
+    await service.waitForFunction(() => document.querySelectorAll('.rt-sky .pkt.held').length === 4);
+    await service.evaluate(() => { window.actorFlights = [...document.querySelectorAll('.rt-sky .pkt.held')].map(node => flightRecords.find(r => r.node === node)); });
+    for (const r of fixture.routes) { r.done = true; r.status = 200; r.ms = 900; r.tries[0].done = true; r.tries[0].status = 200; r.tries[0].ms = 900; }
+    update(harness, fixture);
+    await service.waitForFunction(() => actorFlights.every(r => !r.node.isConnected));
+    const returns = await service.evaluate(() => actorFlights.map(({ first, last, samples }) => ({ first, last, samples })));
+    for (const flight of returns) assertHome(flight, flight.first.near.title.includes('Session id: alpha') ? 'alpha' : 'bravo');
+    await service.waitForFunction(() => !document.querySelector('.rt-actor.active'));
+    fixture.routes = [main, independent]; fixture.ids = fixture.routes.map(r => r.id); update(harness, fixture);
+    await service.waitForFunction(() => !document.querySelector('.rt-src[title*="Session id: alpha"] .rt-activity'));
+    harness.aggregator.setConnection({ status: 'stale', reason: 'gateway_unavailable' });
+    await service.waitForFunction(() => !document.querySelector('.rt-src,.rt-actor,.rt-sky .pkt'));
     noErrors(h);
   });
 

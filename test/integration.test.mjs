@@ -26,16 +26,16 @@ async function reservePort() {
   await new Promise(resolve => server.close(resolve));
   return port;
 }
-async function fixture(t, { history, gateway } = {}) {
+async function fixture(t, { history, gateway, options: settings = {}, trace = initialTrace() } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'session-routing-integration-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  const options = { port: await reservePort(), installationId: randomBytes(16).toString('base64url'), apiToken: randomBytes(32).toString('base64url') };
+  const options = { port: await reservePort(), installationId: randomBytes(16).toString('base64url'), apiToken: randomBytes(32).toString('base64url'), ...settings };
   const config = createConfig({ directory }, options, { env: { MAGPIE_ADDR: '127.0.0.1:3425' } });
   const persist = entry => writeFile(join(directory, 'plugins.json'), JSON.stringify({ plugins: [entry] }));
   const entry = { spec: root, options };
   await persist(entry);
-  const aggregator = createAggregator();
-  if (!gateway) aggregator.applyTrace(initialTrace(), { full: true });
+  const aggregator = createAggregator({ showFolders: config.showFolders, showProjectNames: config.showProjectNames });
+  if (!gateway) aggregator.applyTrace(trace, { full: true });
   const collector = gateway ? createCollector({ gateway, aggregator, backoffMs: 10 }) : null;
   if (collector) t.after(() => collector.stop());
   let collectorStarts = 0;
@@ -133,6 +133,61 @@ test('native HTTP viewers share the projector, stable seats and exact recorded s
   await f.persist({ ...f.entry, off: true });
   const revoked = await f.request('/api/native-routing');
   assert.equal(revoked.status, 403); assert.equal(revoked.body.routes, undefined);
+});
+
+test('protected native HTTP preserves configured brands, project basenames and opaque actor evidence', async t => {
+  const names = ['Gemini CLI', 'Antigravity', 'Kiro', 'StepFun', '团队 — Custom (EU)'];
+  const icons = ['geminicli-color', 'antigravity-color', 'kiro-color', 'stepfun-color', 'generic'];
+  const routes = names.map((name, index) => makeRoute(index + 1, { folder: '/PRIVATE-PARENT/PROJECT-CANARY',
+    sub: 'PRIVATE-ACTOR@example.invalid', parentSession: 'TITLE-PARENT-CANARY',
+    order: [{ id: 'PRIVATE-SEAT@example.invalid', provider: 'private-configured-provider', name, who: 'PRIVATE-ACCOUNT-CANARY',
+      model: 'model-a', routing: 'order', kind: 'account',
+      ...(index === 2 ? { preset: icons[index] } : index === 4 ? { icon: 'file:/PRIVATE-ICON-CANARY', preset: 'openai' } : { icon: icons[index] }) }],
+    tries: [{ id: 'PRIVATE-SEAT@example.invalid', model: 'model-a', start: '2026-11-06T12:00:00.000Z', done: false }],
+    ...(index === 1 ? { subagentId: 'PRIVATE-ACTOR@example.invalid' } : index === 2 ? { subagentId: 'CONFLICT-CANARY' } : {}) }));
+  const f = await fixture(t, { trace: { ...initialTrace(), routes, ids: routes.map(route => route.id) } });
+  assert.equal((await f.request('/api/native-routing', { auth: false })).status, 401);
+  const response = await f.request('/api/native-routing', { Origin: 'null' });
+  assert.equal(response.status, 200);
+  assert.equal(f.starts, 1);
+  for (const route of response.body.routes) {
+    const index = route.id - 1;
+    assert.equal(route.order[0].name, names[index]);
+    assert.equal(route.order[0].icon, icons[index]);
+    assert.match(route.order[0].provider, /^provider_/u);
+    assert.equal(route.projectName, 'PROJECT-CANARY');
+    assert.equal(route.folder, undefined);
+    assert.equal(route.isSubagent, true);
+    assert.equal(route.parentSession, undefined);
+    if (index === 2) {
+      assert.equal(route.actorId, undefined);
+      assert.ok(route.evidence.reasons.includes('actor_identity_conflict'));
+    } else assert.match(route.actorId, /^actor_[A-Za-z0-9_-]{22}$/u);
+    if (index === 0) assert.equal(route.subagentId, undefined, 'tool-less header is not a turn marker');
+    if (index === 1) assert.equal(route.subagentId, route.actorId);
+  }
+  assert.equal(new Set(response.body.routes.filter(route => route.actorId).map(route => route.actorId)).size, 1);
+  assert.equal(new Set(response.body.routes.map(route => route.order[0].id)).size, 1);
+  assert.doesNotMatch(JSON.stringify(response.body), /PRIVATE-|private-configured-provider|TITLE-PARENT-CANARY|CONFLICT-CANARY|DO-NOT-EXPOSE/);
+  const legacy = await f.request('/api/state');
+  assert.equal(legacy.body.requests.some(route => Object.hasOwn(route, 'projectName') || Object.hasOwn(route, 'actorId')), false);
+});
+
+test('protected APIs with both disclosure options off contain neither folder nor project canaries', async t => {
+  const route = makeRoute(1, { folder: '/PARENT-CANARY/PROJECT-CANARY', rule: { folder: '/RULE-PARENT-CANARY/RULE-PROJECT-CANARY' } });
+  const f = await fixture(t, { options: { showFolders: false, showProjectNames: false },
+    trace: { ...initialTrace(), routes: [route], ids: [route.id] } });
+  for (const path of ['/api/native-routing', '/api/state', '/api/sessions']) {
+    const response = await f.request(path);
+    assert.equal(response.status, 200);
+    assert.doesNotMatch(JSON.stringify(response.body), /PARENT-CANARY|PROJECT-CANARY|"projectName"/);
+    assert.ok((response.body.sessions ?? []).every(session => session.folder == null));
+    assert.ok((response.body.routes ?? response.body.requests ?? []).every(route => !Object.hasOwn(route, 'folder')));
+  }
+  await f.persist({ ...f.entry, options: { ...f.entry.options, showProjectNames: true } });
+  const revoked = await f.request('/api/native-routing');
+  assert.equal(revoked.status, 403);
+  assert.equal(revoked.body.routes, undefined);
 });
 
 test('scope switching cannot mutate cached records and gateway reset drops prior activity', () => {

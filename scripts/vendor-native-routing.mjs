@@ -96,6 +96,103 @@ export function extract(s) {
   out = prune(out);
   return out;
 }
+// Plugin-owned activity subdivision, deliberately separate from the native
+// flight engine. Its only state belongs to the existing exact-session node.
+export const SOURCE_ACTIVITY = `
+  function sourceRequests(key, staged, map = src(), clock = now()) {
+    const selected = new Set(staged.map((r) => r.id));
+    return [...map.values()].filter((r) => sourceKey(r) === key &&
+      (!r.done || at(r.time) + (r.ms || 0) > clock - LINGER || selected.has(r.id)))
+      .sort((a, b) => a.id - b.id);
+  }
+  function actorGroups(requests) {
+    const groups = new Map();
+    for (const r of requests) {
+      if (!r.isSubagent && !r.actorId) continue;
+      const key = r.actorId || null;
+      let entry = groups.get(key);
+      if (!entry) groups.set(key, entry = { id: key, active: 0, ended: 0 });
+      if (r.done) entry.ended++; else entry.active++;
+    }
+    return groups;
+  }
+  function actorLabels(ids) {
+    const sorted = [...ids].filter(Boolean).sort(), labels = new Map();
+    const common = (a, b = "") => { let n = 0; while (n < a.length && a[n] === b[n]) n++; return n; };
+    for (let i = 0; i < sorted.length; i++) {
+      const id = sorted[i], n = Math.max(14, common(id, sorted[i - 1]) + 1, common(id, sorted[i + 1]) + 1);
+      labels.set(id, id.length > n ? id.slice(0, n) + "…" : id);
+    }
+    return labels;
+  }
+  function sourceActivity(a, requests) {
+    const groups = actorGroups(requests);
+    if (!groups.size) {
+      a.activity?.node.remove();
+      delete a.activity;
+      return;
+    }
+    if (!a.activity) {
+      const node = el("details", "rt-activity"), summary = el("summary"),
+        list = el("ul", "rt-actors"), overflow = el("span", "rt-activity-overflow");
+      node.open = true;
+      list.tabIndex = 0;
+      node.append(summary, list, overflow);
+      a.node.append(node);
+      const activity = a.activity = { node, summary, list, overflow, entries: new Map() };
+      // Viewport limits presentation only, never the number of observed actors.
+      activity.measure = () => {
+        if (!node.open) return;
+        const box = list.getBoundingClientRect();
+        const outside = [...list.children].filter((n) => {
+          const r = n.getBoundingClientRect();
+          return r.top < box.top - 1 || r.bottom > box.bottom + 1;
+        }).length;
+        setText(overflow, outside ? t("{n} activity entries outside view; scroll to view all", { n: outside }) : "");
+      };
+      list.addEventListener("scroll", activity.measure, { passive: true });
+      node.addEventListener("toggle", activity.measure);
+    }
+    const { summary, list, entries, measure } = a.activity, labels = actorLabels(groups.keys());
+    for (const [id, e] of entries) if (!groups.has(id)) { e.node.remove(); entries.delete(id); }
+    let total = 0, active = 0;
+    for (const [id, group] of groups) {
+      total += group.active + group.ended; active += group.active;
+      let e = entries.get(id);
+      if (!e) {
+        const node = el("li", "rt-actor"), label = el("span", "rt-actor-label"), count = el("span", "rt-actor-count");
+        node.dataset.actorId = id || "";
+        node.append(label, count); list.append(node);
+        entries.set(id, e = { node, label, count });
+      }
+      const label = id ? t("Actor {id}", { id: labels.get(id) }) : t("Sub-agent activity — actor unavailable");
+      const count = t("Active gateway requests: {n}", { n: group.active }) +
+        (group.ended ? " · " + t("Gateway requests ended: {n}", { n: group.ended }) : "");
+      setText(e.label, label); setText(e.count, count);
+      setAttr(e.node, "title", (id || label) + "\\n" + count + "\\n" + t("Gateway request activity only; task completion is unknown."));
+      e.node.classList.toggle("active", group.active > 0);
+    }
+    setText(summary, t("Sub-agent activity · {n} requests", { n: total }));
+    setAttr(summary, "aria-label", t("Sub-agent activity: {actors} identified actors; {unknown} requests with actor unavailable; {active} active gateway requests", {
+      actors: groups.size - Number(groups.has(null)), unknown: groups.has(null) ? groups.get(null).active + groups.get(null).ended : 0, active,
+    }));
+    setAttr(list, "aria-label", t("Sub-agent gateway requests — scroll for all activity"));
+    measure();
+  }
+`;
+const ACTIVITY_TRANSLATIONS = {
+  'zh-TW': {
+    'Actor {id}': '行為者 {id}',
+    'Sub-agent activity — actor unavailable': '子代理活動 — 行為者不明',
+    'Active gateway requests: {n}': '進行中的閘道請求：{n}',
+    'Gateway requests ended: {n}': '已結束的閘道請求：{n}',
+    'Gateway request activity only; task completion is unknown.': '僅表示閘道請求活動；無法判定任務是否完成。',
+    'Sub-agent activity · {n} requests': '子代理活動 · {n} 個請求',
+    'Sub-agent activity: {actors} identified actors; {unknown} requests with actor unavailable; {active} active gateway requests': '子代理活動：{actors} 個已識別行為者；{unknown} 個行為者不明的請求；{active} 個進行中的閘道請求',
+    'Sub-agent gateway requests — scroll for all activity': '子代理閘道請求 — 捲動以查看所有活動',
+    '{n} activity entries outside view; scroll to view all': '{n} 個活動項目未顯示；捲動以查看全部',
+  },
+}; // Other locales intentionally use the native English-message fallback.
 export function sessionPatch(s) {
   const edits = [];
   const p = (a,b) => { s = replace(s,a,b); edits.push({before:a,after:b}); };
@@ -118,8 +215,12 @@ export function sessionPatch(s) {
   p('setText(a.name, agentName(id));', 'setText(a.name, agentName(r.agent));');
   p('filter((x) => x.agent === id &&', 'filter((x) => sourceKey(x) === id &&');
   p('...rs.filter((x) => x.agent === id)', '...rs.filter((x) => sourceKey(x) === id)');
-  p('setText(a.sub, fs.length > 1 ? fs.map(lastLevel).join(", ") : r.model);', 'setText(a.sub, sourceLabel(r) + " · " + (fs.length > 1 ? fs.map(lastLevel).join(", ") : r.model));');
-  p('const tip = [agentName(id), r.model, ...fs.map((f) => t("Folder") + ": " + f)].join("\\n");', 'const tip = [agentName(r.agent), r.model, r.session ? t("Session id") + ": " + r.session : sourceLabel(r), ...fs.map((f) => t("Folder") + ": " + f)].join("\\n");');
+  p('const n = now(), going = pinned ? [] : [...src().values()].filter((x) => sourceKey(x) === id && (!x.done || at(x.time) + (x.ms || 0) > n - LINGER));\n      const fs = foldersOf([...new Set([...going, ...rs.filter((x) => sourceKey(x) === id)])].sort((x, y) => x.id - y.id));',
+    'const relevant = sourceRequests(id, rs), fs = foldersOf(relevant);\n      // Project disclosure is independent of full-folder disclosure. Never infer it from folder.\n      const projects = [...new Set(relevant.map((x) => x.projectName).filter(Boolean))];');
+  p('setText(a.sub, fs.length > 1 ? fs.map(lastLevel).join(", ") : r.model);', 'setText(a.sub, projects.length ? projects.map(lastLevel).join(", ") + " · " + sourceLabel(r) : sourceLabel(r) + " · " + r.model);');
+  p('const tip = [agentName(id), r.model, ...fs.map((f) => t("Folder") + ": " + f)].join("\\n");', 'const tip = [agentName(r.agent), r.model, r.session ? t("Session id") + ": " + r.session : sourceLabel(r), ...projects, ...fs.map((f) => t("Folder") + ": " + f)].join("\\n");');
+  p('function agentNode(id, actualAgent = id) {', SOURCE_ACTIVITY + '\n  function agentNode(id, actualAgent = id) {');
+  p('const n = now(), rs = staged();', 'const n = now(), rs = staged();\n    // Activity reads retained gateway truth, never the synthetic replay clock/status.\n    for (const [key, a] of agents) sourceActivity(a, sourceRequests(key, rs, routes, Date.now() + skew));');
   p('header(cur, ags.length);', 'header(cur, actualAgents.length);');
   p('agents.size <= 1', 'new Set(rs.map((r) => r.agent)).size <= 1');
   p('agents.size > 1', 'new Set(rs.map((r) => r.agent)).size > 1');
@@ -206,7 +307,8 @@ export function generate({ upstream, check=false }={}) {
   const runtime='// Generated from pinned upstream, see source-manifest.json.\n'+
     'const NATIVE_CLIENTS = '+JSON.stringify(manifest.clients)+';\n'+
     'const NATIVE_ICONS = new Set('+JSON.stringify(icons.map(f=>path.basename(f.path).replace(/\.(svg|png)$/,'')))+');\n'+
-    helpers+'\n'+read('i18n.js')+'\n'+strings+'\n'+read('plugins/routing/i18n.js').replace('magpie.strings(', 'nativeStrings(')+'\n'+read('purposes.js');
+    helpers+'\n'+read('i18n.js')+'\n'+strings+'\n'+read('plugins/routing/i18n.js').replace('magpie.strings(', 'nativeStrings(')+
+    '\n// Plugin-owned activity labels; other locales retain native English fallback.\nnativeStrings('+JSON.stringify(ACTIVITY_TRANSLATIONS)+');\n'+read('purposes.js');
   let markup=lines(source,23,28).replace(/^.*id="rtGoGroups".*\n/m,'').replace(/^.*id="rtNewGroup".*\n/m,'').replace(/^.*id="rtMore".*\n/m,'');
   const defs=read('index.html').match(/<defs><path id="bird"[\s\S]*?<\/defs>/)?.[0];
   if (!defs) throw new Error('Native bird artwork missing');
@@ -231,8 +333,9 @@ export function generate({ upstream, check=false }={}) {
       {location:'firstWhy / mode', difference:'Retained scalar routing evidence drives native descriptions; incomplete reasons say unavailable in the original explanation location.'},
       {location:'duration / outcome / statistics', difference:'Missing measurements and outcomes say unavailable; missing totals use an em dash rather than invented zero.'},
       {location:'account labels and tooltips', difference:'Stable opaque backend handles and neutral names replace raw account identities; mask only hides these neutral labels. External live quota windows are not read.'},
-      {location:'group / provider headings', difference:'Recorded sanitized group metadata is retained; private group/provider labels are neutral and settings navigation is removed, not stubbed.'},
-      {location:'source names / model subtitles', difference:'Pinned built-in client labels/icons replace installed-client inventory. Private session titles and original headers are not read. Effective recorded session only; folder metadata is opt-in.'},
+      {location:'group / provider headings', difference:'Recorded safe provider names and bundled icon/preset metadata retain native precedence; unavailable or unsupported metadata uses neutral/generic fallback. Private group/account identities remain opaque and settings navigation is removed, not stubbed.'},
+      {location:'source names / model subtitles', difference:'Pinned built-in client labels/icons replace installed-client inventory. A separately disclosed project basename precedes the short session, including a single project; model and full session remain in the tooltip. No folder-to-project inference. Full folder metadata is separately opt-in.'},
+      {location:'source child activity / ui/style.css', difference:'Plugin-owned flat activity boxes inside the exact session source summarize all retained source-local active/recent requests by opaque actor, with one unknown-actor request bucket. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. Collapsible keyboard/touch scroll exposes all retained entries; no added actor cap. Only this extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English.'},
       {location:'gateway subtitle / clock', difference:'Collected process identity is shown without a gateway URL; missing source clock blocks live playback. Group clock configuration is unavailable.'},
       {location:'quota / formatting helpers', difference:'Recorded quota fields remain; provider-supplied display text, live windows, expiry inventory, currency preferences and exchange rates are not fetched. Native default number/USD formatting remains.'},
       {location:'transport / lifecycle', difference:'Authenticated bounded whole snapshots replace core polling; collector live status is not process ownership. Hidden/aborted/revoked and generation reset paths clear or pause native playback.'},

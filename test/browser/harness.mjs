@@ -10,7 +10,7 @@ import { createHistory } from '../../lib/history.mjs';
 export function nativeTrace({ sessions = ['session-alpha', 'session-alpha', 'session-bravo'], agents = [], done = false } = {}) {
   const time = '2026-11-09T00:00:09.000Z';
   const seats = [0, 1].map(rank => ({ id: `fixture-private-account-${rank}@example.invalid`, provider: 'anthropic',
-    kind: 'account', name: 'DO-NOT-EXPOSE-NAME', who: 'DO-NOT-EXPOSE-ACCOUNT', model: 'example-model', icon: 'claude-color',
+    kind: 'account', name: 'Anthropic Workspace', who: 'DO-NOT-EXPOSE-ACCOUNT', model: 'example-model', icon: 'claude-color',
     routing: 'order', rank, known: true, used: rank ? 15 : 35, renews: ['2026-11-09T01:00:00.000Z'] }));
   const routes = sessions.map((session, i) => ({ id: i + 1, seq: i + 1, agent: agents[i] || 'claude', session,
     time, model: 'example-model', provider: 'anthropic', done,
@@ -72,12 +72,12 @@ async function freePort() {
 
 // This is a protocol-shaped browser harness, NOT the real Magpie proxy. Real-host
 // validation lives separately under test/magpie and is reported separately.
-export async function browserHarness({ unprovisioned = false, fixture = nativeTrace(), ledgerRows = null, showFolders = false } = {}) {
+export async function browserHarness({ unprovisioned = false, fixture = nativeTrace(), ledgerRows = null, showFolders = false, showProjectNames = true } = {}) {
   const servicePort = await freePort();
   let options = unprovisioned ? { port: servicePort } : {
     port: servicePort, installationId: randomBytes(16).toString('base64url'), apiToken: randomBytes(32).toString('base64url'),
   };
-  const aggregator = createAggregator({ instanceId: 'browser-fixture', showFolders });
+  const aggregator = createAggregator({ instanceId: 'browser-fixture', showFolders, showProjectNames });
   let replacement = null;
   const projection = { snapshot: scope => (replacement || aggregator).snapshot(scope),
     nativeSnapshot: () => (replacement || aggregator).nativeSnapshot() };
@@ -109,7 +109,7 @@ export async function browserHarness({ unprovisioned = false, fixture = nativeTr
   };
   async function ensureService() {
     if (service) return;
-    const config = { ...options, showFolders: false, host: '127.0.0.1', provisioned: true };
+    const config = { ...options, showFolders, showProjectNames, host: '127.0.0.1', provisioned: true };
     service = createServer({ config, aggregator: projection, history,
       startCollector() { collectorStarts++; },
       authorizeInstallation: async () => authorized && options.apiToken === config.apiToken,
