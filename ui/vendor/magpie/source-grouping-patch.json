@@ -1,0 +1,102 @@
+[
+  {
+    "before": "const agents = new Map(); // agent → { node, ic, name, sub, wire }",
+    "after": "const agents = new Map(); // exact recorded source → { node, ic, name, sub, wire }\n  const sourceKey = (r) => typeof r.session === \"string\" && r.session.length\n    ? JSON.stringify([\"session\", r.agent, r.session])\n    : JSON.stringify([\"unknown\", r.agent, host.generation(), r.id, r.time]);\n  const sourceLabel = (r) => r.session ? (r.session.length > 14 ? r.session.slice(0, 12) + \"…\" : r.session) : t(\"Unknown session\") + \" · #\" + r.id;"
+  },
+  {
+    "before": "last.set(r.agent, r)",
+    "after": "last.set(sourceKey(r), r)"
+  },
+  {
+    "before": "last.get(r.agent) === r",
+    "after": "last.get(sourceKey(r)) === r"
+  },
+  {
+    "before": "out.map((r) => r.agent)",
+    "after": "out.map(sourceKey)"
+  },
+  {
+    "before": "ags.includes(r.agent)",
+    "after": "ags.includes(sourceKey(r))"
+  },
+  {
+    "before": "function agentNode(id) {",
+    "after": "function agentNode(id, actualAgent = id) {"
+  },
+  {
+    "before": "node.style.setProperty(\"--agent\", hueOf(id));\n    a.wire.style.setProperty(\"--agent\", hueOf(id));",
+    "after": "node.style.setProperty(\"--agent\", hueOf(actualAgent));\n    a.wire.style.setProperty(\"--agent\", hueOf(actualAgent));"
+  },
+  {
+    "before": "const ags = [...new Set(rs.map((r) => r.agent))];",
+    "after": "const ags = [...new Set(rs.map(sourceKey))];\n    const actualAgents = [...new Set(rs.map((r) => r.agent))];"
+  },
+  {
+    "before": ".map((id) => agentNode(id).node)",
+    "after": ".map((id) => agentNode(id, rs.find((r) => sourceKey(r) === id).agent).node)"
+  },
+  {
+    "before": "hues(ags);",
+    "after": "hues(actualAgents);"
+  },
+  {
+    "before": "const a = agents.get(id), r = rs.filter((x) => x.agent === id).pop(), ag = agentOf(id);",
+    "after": "const a = agents.get(id), r = rs.filter((x) => sourceKey(x) === id).pop(), ag = agentOf(r.agent);"
+  },
+  {
+    "before": "for (const n of [a.node, a.wire]) n.style.setProperty(\"--agent\", hueOf(id));",
+    "after": "for (const n of [a.node, a.wire]) n.style.setProperty(\"--agent\", hueOf(r.agent));"
+  },
+  {
+    "before": "setText(a.name, agentName(id));",
+    "after": "setText(a.name, agentName(r.agent));"
+  },
+  {
+    "before": "filter((x) => x.agent === id &&",
+    "after": "filter((x) => sourceKey(x) === id &&"
+  },
+  {
+    "before": "...rs.filter((x) => x.agent === id)",
+    "after": "...rs.filter((x) => sourceKey(x) === id)"
+  },
+  {
+    "before": "setText(a.sub, fs.length > 1 ? fs.map(lastLevel).join(\", \") : r.model);",
+    "after": "setText(a.sub, sourceLabel(r) + \" · \" + (fs.length > 1 ? fs.map(lastLevel).join(\", \") : r.model));"
+  },
+  {
+    "before": "const tip = [agentName(id), r.model, ...fs.map((f) => t(\"Folder\") + \": \" + f)].join(\"\\n\");",
+    "after": "const tip = [agentName(r.agent), r.model, r.session ? t(\"Session id\") + \": \" + r.session : sourceLabel(r), ...fs.map((f) => t(\"Folder\") + \": \" + f)].join(\"\\n\");"
+  },
+  {
+    "before": "header(cur, ags.length);",
+    "after": "header(cur, actualAgents.length);"
+  },
+  {
+    "before": "agents.size <= 1",
+    "after": "new Set(rs.map((r) => r.agent)).size <= 1"
+  },
+  {
+    "before": "agents.size > 1",
+    "after": "new Set(rs.map((r) => r.agent)).size > 1"
+  },
+  {
+    "before": "busy.add(r.agent)",
+    "after": "busy.add(sourceKey(r))"
+  },
+  {
+    "before": "busy.add(f.agent)",
+    "after": "busy.add(f.sourceKey)"
+  },
+  {
+    "before": "const flying = new Map(); // packet → { id: the row it is at, agent }",
+    "after": "const flying = new Map(); // packet → { id: the row it is at, agent, sourceKey }"
+  },
+  {
+    "before": "const A = agents.get(r.agent);",
+    "after": "const A = agents.get(sourceKey(r));"
+  },
+  {
+    "before": "flying.set(dot, { id: tryseat(r, r.tries[i]), agent: r.agent });",
+    "after": "flying.set(dot, { id: tryseat(r, r.tries[i]), agent: r.agent, sourceKey: sourceKey(r) });"
+  }
+]

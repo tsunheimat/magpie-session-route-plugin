@@ -5,7 +5,23 @@ import { once } from 'node:events';
 import { createServer } from '../../lib/server.mjs';
 import { createAggregator } from '../../lib/aggregator.mjs';
 import { createHistory } from '../../lib/history.mjs';
-import { initialTrace } from '../fixtures/trace.mjs';
+// Raw gateway-shaped data enters the real aggregator; never hand a permissive
+// native DTO straight to the production UI. All identities here are synthetic.
+export function nativeTrace({ sessions = ['session-alpha', 'session-alpha', 'session-bravo'], agents = [], done = false } = {}) {
+  const time = '2026-11-09T00:00:09.000Z';
+  const seats = [0, 1].map(rank => ({ id: `fixture-private-account-${rank}@example.invalid`, provider: 'anthropic',
+    kind: 'account', name: 'DO-NOT-EXPOSE-NAME', who: 'DO-NOT-EXPOSE-ACCOUNT', model: 'example-model', icon: 'claude-color',
+    routing: 'order', rank, known: true, used: rank ? 15 : 35, renews: ['2026-11-09T01:00:00.000Z'] }));
+  const routes = sessions.map((session, i) => ({ id: i + 1, seq: i + 1, agent: agents[i] || 'claude', session,
+    time, model: 'example-model', provider: 'anthropic', done,
+    order: seats.map(s => ({ ...s })), tries: [{ id: seats[0].id, model: seats[0].model, start: time, done,
+      ...(done ? { status: 200, ms: 600, ttft: 200 } : {}) }], left: [],
+    ...(done ? { status: 200, ms: 600, ttft: 200, tokens: 100, out: 40 } : {}),
+    prompt: 'DO-NOT-EXPOSE-PROMPT', headers: { authorization: 'DO-NOT-EXPOSE-TOKEN' }, archive: 'DO-NOT-EXPOSE-ARCHIVE',
+  }));
+  return { object: 'trace', now: '2026-11-09T00:00:10.000Z', seq: routes.length, pid: 77, serves: 'web',
+    routes, ids: routes.map(r => r.id), totals: { requests: done ? routes.length : 0, rerouted: 0, errors: 0 }, lifted: {} };
+}
 
 const PREFIX = '/_magpie/plugin/test-page-token/';
 const SERVICE = `${PREFIX}_magpie/service/`;
@@ -23,7 +39,10 @@ const launcherBridge = `(() => {
 
 const hostScript = `(() => {
   const frame = document.querySelector('iframe'); let dark=false;
-  window.testTheme = value => {dark=value; frame.contentWindow.postMessage({magpie:1,event:'theme',data:{dark,lang:'en',tokens:{}}},'*');};
+  let lang='en';
+  const theme = () => frame.contentWindow.postMessage({magpie:1,event:'theme',data:{dark,lang,tokens:{}}},'*');
+  window.testTheme = value => {dark=value; theme();};
+  window.testLocale = value => {lang=value; theme();};
   window.testVisibility = visible => frame.contentWindow.postMessage({magpie:1,event:'visibility',data:{visible}},'*');
   addEventListener('message',async event=>{
     if(event.source!==frame.contentWindow || event.data?.magpie!==1)return;
@@ -53,20 +72,21 @@ async function freePort() {
 
 // This is a protocol-shaped browser harness, NOT the real Magpie proxy. Real-host
 // validation lives separately under test/magpie and is reported separately.
-export async function browserHarness({ unprovisioned = false, fixture = initialTrace(), ledgerRows = null } = {}) {
+export async function browserHarness({ unprovisioned = false, fixture = nativeTrace(), ledgerRows = null, showFolders = false } = {}) {
   const servicePort = await freePort();
   let options = unprovisioned ? { port: servicePort } : {
     port: servicePort, installationId: randomBytes(16).toString('base64url'), apiToken: randomBytes(32).toString('base64url'),
   };
-  const aggregator = createAggregator({ instanceId: 'browser-fixture' });
+  const aggregator = createAggregator({ instanceId: 'browser-fixture', showFolders });
   let replacement = null;
-  const projection = { snapshot: scope => (replacement || aggregator).snapshot(scope) };
+  const projection = { snapshot: scope => (replacement || aggregator).snapshot(scope),
+    nativeSnapshot: () => (replacement || aggregator).nativeSnapshot() };
   aggregator.applyTrace(fixture, { full: true });
   aggregator.setConnection({ status: 'live', gatewayVersion: '0.1.3124' });
   let service;
   let collectorStarts = 0;
-  let delaySession = null;
   let delayMs = 0;
+  let authorized = true;
   const pendingTimers = new Set();
   const observations = [];
   const sockets = new Set();
@@ -92,7 +112,7 @@ export async function browserHarness({ unprovisioned = false, fixture = initialT
     const config = { ...options, showFolders: false, host: '127.0.0.1', provisioned: true };
     service = createServer({ config, aggregator: projection, history,
       startCollector() { collectorStarts++; },
-      authorizeInstallation: async () => options.apiToken === config.apiToken,
+      authorizeInstallation: async () => authorized && options.apiToken === config.apiToken,
     });
     await service.listen();
   }
@@ -138,7 +158,7 @@ export async function browserHarness({ unprovisioned = false, fixture = initialT
           res.on('close', () => upstream.destroy());
           req.pipe(upstream);
         };
-        if (url.pathname.endsWith('/api/state') && url.searchParams.get('session') === delaySession && delayMs) {
+        if (url.pathname.endsWith('/api/native-routing') && delayMs) {
           const timer = setTimeout(() => { pendingTimers.delete(timer); proxy(); }, delayMs);
           pendingTimers.add(timer);
         } else proxy();
@@ -173,7 +193,8 @@ export async function browserHarness({ unprovisioned = false, fixture = initialT
     url: origin, aggregator, observations,
     get collectorStarts() { return collectorStarts; },
     get options() { return options; },
-    delay(session, ms) { delaySession = session; delayMs = ms; },
+    delayNative(ms) { delayMs = ms; },
+    revoke() { authorized = false; },
     replaceProjection(next) { replacement = next; },
     async close() {
       for (const timer of pendingTimers) clearTimeout(timer);

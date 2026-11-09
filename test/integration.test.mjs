@@ -109,6 +109,32 @@ test('independent HTTP viewers share one collector and scope graph, timeline and
   assert.equal(f.starts, 1);
 });
 
+test('native HTTP viewers share the projector, stable seats and exact recorded sessions without raw identities', async t => {
+  const f = await fixture(t);
+  assert.equal((await f.request('/api/native-routing', { auth: false })).status, 401);
+  const [a, b] = await Promise.all([f.request('/api/native-routing', { Origin: 'null' }), f.request('/api/native-routing', { Origin: 'null' })]);
+  assert.equal(a.status, 200); assert.deepEqual(a.body, b.body); assert.equal(f.starts, 1);
+  assert.equal(a.body.object, 'trace'); assert.equal(a.body.routes.length, 5);
+  const routes = new Map(a.body.routes.map(r => [r.id, r]));
+  assert.equal(routes.get(101).session, routes.get(103).session);
+  assert.notEqual(routes.get(101).session, routes.get(102).session);
+  assert.notEqual(routes.get(101).agent, routes.get(104).agent);
+  assert.equal(routes.get(105).session, null);
+  assert.equal(routes.get(101).order[0].id, routes.get(102).order[0].id);
+  assert.equal(routes.get(101).tries[0].id, routes.get(101).order[0].id);
+  assert.doesNotMatch(JSON.stringify(a.body), /DO-NOT-EXPOSE|private-a@example|secret-token|prompt|archive/);
+  assert.equal(a.body.coverage.inventory, 'unavailable');
+  const oldSeat = routes.get(101).order[0].id;
+  f.aggregator.clear('stopped');
+  assert.equal((await f.request('/api/native-routing')).body.routes.length, 0);
+  f.aggregator.applyTrace(initialTrace(), { full: true });
+  const reset = (await f.request('/api/native-routing')).body;
+  assert.notEqual(reset.routes[0].order[0].id, oldSeat);
+  await f.persist({ ...f.entry, off: true });
+  const revoked = await f.request('/api/native-routing');
+  assert.equal(revoked.status, 403); assert.equal(revoked.body.routes, undefined);
+});
+
 test('scope switching cannot mutate cached records and gateway reset drops prior activity', () => {
   const aggregator = createAggregator();
   aggregator.applyTrace(initialTrace(), { full: true });
@@ -167,7 +193,7 @@ test('real gateway client and collector share one incremental poll across concur
   assert.equal(waiting.size, 1);
   const a = '/api/state?session=' + sessionKey('claude-code', 'session-alpha');
   const b = '/api/state?session=' + sessionKey('claude-code', 'session-bravo');
-  const results = await Promise.all(Array.from({ length: 16 }, (_, index) => f.request(index % 2 ? a : b)));
+  const results = await Promise.all(Array.from({ length: 18 }, (_, index) => f.request([a, b, '/api/native-routing'][index % 3])));
   assert.ok(results.every(response => response.status === 200));
   assert.equal(f.starts, 1); assert.equal(maxPolls, 1); assert.equal(waiting.size, 1);
   assert.equal(seen.length, 3, 'Viewer refreshes must not open additional gateway polls');

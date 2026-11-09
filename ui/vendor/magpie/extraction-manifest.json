@@ -1,0 +1,207 @@
+{
+  "revision": "3f53fa1f316330b77e5ff6d065a7a56980cafda2",
+  "generator": "scripts/vendor-native-routing.mjs",
+  "generatorSha256": "f460a130c413a51c98c4d99e177c67cb80296b537d49d93ff47e6fb4222120b1",
+  "lifecycle": "ui/native-lifecycle.inc.js",
+  "lifecycleSha256": "acf0b646179d916bbf8e758c8f82321f678c9dbd9c70c13fbdd094f42f697f18",
+  "baselineSha256": "1dc45c97e12665fe03fa3fe56e8fc63ad3feb2e305526d626d12526d40564383",
+  "sessionSha256": "0b96864bc0f6718a99a18e6d7f2ac77efa163febb032e3e3852665cf346ccff0",
+  "sessionPatch": "source-grouping-patch.json",
+  "sourceRanges": [
+    [
+      43,
+      109
+    ],
+    [
+      120,
+      132
+    ],
+    [
+      295,
+      312
+    ],
+    [
+      349,
+      534
+    ],
+    [
+      561,
+      634
+    ],
+    [
+      636,
+      1560
+    ],
+    [
+      1590,
+      1620
+    ],
+    [
+      1623,
+      2128
+    ],
+    [
+      2146,
+      2692
+    ],
+    [
+      2726,
+      2748
+    ],
+    [
+      2750,
+      2933
+    ],
+    [
+      2935,
+      2979
+    ],
+    [
+      2980,
+      2981
+    ],
+    [
+      2985,
+      2985
+    ],
+    [
+      3058,
+      3105
+    ],
+    [
+      3216,
+      3338
+    ],
+    [
+      3358,
+      3370
+    ],
+    [
+      3395,
+      3601
+    ],
+    [
+      3622,
+      3622
+    ],
+    [
+      3637,
+      3667
+    ],
+    [
+      4072,
+      4078
+    ],
+    [
+      4806,
+      5251
+    ],
+    [
+      5254,
+      5258
+    ],
+    [
+      5260,
+      5299
+    ],
+    [
+      5301,
+      5304
+    ],
+    [
+      5306,
+      5333
+    ],
+    [
+      5335,
+      5345
+    ],
+    [
+      5466,
+      5483
+    ],
+    [
+      5486,
+      5487
+    ],
+    [
+      8497,
+      8505
+    ]
+  ],
+  "ingestRange": [
+    5392,
+    5459
+  ],
+  "dataAndPrivacyDifferences": [
+    {
+      "location": "header / destination member counts",
+      "difference": "Enabled-account counts and only-one-configured-account explanation are omitted; trace candidates are not configuration inventory."
+    },
+    {
+      "location": "firstWhy / mode",
+      "difference": "Retained scalar routing evidence drives native descriptions; incomplete reasons say unavailable in the original explanation location."
+    },
+    {
+      "location": "duration / outcome / statistics",
+      "difference": "Missing measurements and outcomes say unavailable; missing totals use an em dash rather than invented zero."
+    },
+    {
+      "location": "account labels and tooltips",
+      "difference": "Stable opaque backend handles and neutral names replace raw account identities; mask only hides these neutral labels. External live quota windows are not read."
+    },
+    {
+      "location": "group / provider headings",
+      "difference": "Recorded sanitized group metadata is retained; private group/provider labels are neutral and settings navigation is removed, not stubbed."
+    },
+    {
+      "location": "source names / model subtitles",
+      "difference": "Pinned built-in client labels/icons replace installed-client inventory. Private session titles and original headers are not read. Effective recorded session only; folder metadata is opt-in."
+    },
+    {
+      "location": "gateway subtitle / clock",
+      "difference": "Collected process identity is shown without a gateway URL; missing source clock blocks live playback. Group clock configuration is unavailable."
+    },
+    {
+      "location": "quota / formatting helpers",
+      "difference": "Recorded quota fields remain; provider-supplied display text, live windows, expiry inventory, currency preferences and exchange rates are not fetched. Native default number/USD formatting remains."
+    },
+    {
+      "location": "transport / lifecycle",
+      "difference": "Authenticated bounded whole snapshots replace core polling; collector live status is not process ownership. Hidden/aborted/revoked and generation reset paths clear or pause native playback."
+    },
+    {
+      "location": "icon image transport",
+      "difference": "Fixed local images use anonymous CORS so native toneCheck canvas sampling works in the opaque-origin sandbox. Only Origin: null is allowed; no credentials or arbitrary icon URLs."
+    },
+    {
+      "location": "upper header controls / request log",
+      "difference": "Original mask and replay retained; group editor links, usage/body actions, context cards and diagnostic-report actions excluded."
+    }
+  ],
+  "excluded": [
+    "lower requests/history",
+    "group/provider editors and writes",
+    "quota inventory reads/reset",
+    "body/header/archive/context viewers",
+    "raw trace polling",
+    "local agent session-title reads",
+    "tray panel"
+  ],
+  "unavailable": [
+    "configured provider inventory and edit navigation",
+    "external live quota windows",
+    "group configuration clock",
+    "private account/session names",
+    "body/headers/prompts",
+    "routing reasons marked partial by the projector"
+  ],
+  "artwork": {
+    "source": "upstream/icons/",
+    "attribution": "upstream/docs/reference.md lines 84-87",
+    "lobeLicense": "LOBE_ICONS_LICENSE",
+    "lobeLicenseSource": "https://raw.githubusercontent.com/lobehub/lobe-icons/master/LICENSE",
+    "lobeLicenseSha256": "add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a",
+    "note": "Unmodified upstream local artwork. Brand marks identify observed software; no endorsement is claimed."
+  }
+}

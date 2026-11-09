@@ -1,0 +1,4 @@
+# Deterministic native extraction retains whitespace around removed statements.
+# Do not normalize copied source; generator --check verifies these exact bytes.
+ui/vendor/magpie/client.js whitespace=-blank-at-eol
+ui/vendor/magpie/test-only/client.baseline.js whitespace=-blank-at-eol

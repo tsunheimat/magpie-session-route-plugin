@@ -5,90 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="referrer" content="no-referrer">
   <title>Session Routing</title>
+  <link rel="stylesheet" href="vendor/magpie/app.css">
+  <link rel="stylesheet" href="vendor/magpie/routing.css">
   <link rel="stylesheet" href="style.css">
   <script src="bridge.js" defer></script>
+  <script src="vendor/magpie/native-helpers.js" defer></script>
+  <script src="vendor/magpie/client.js" defer></script>
   <script src="app.js" defer></script>
 </head>
-<body>
-  <a class="skip-link" href="#request-list">Skip to requests</a>
-  <main id="session-routing">
-    <header class="page-header">
-      <h1>Session Routing</h1>
-      <label class="session-field" for="session-select">Session
-        <select id="session-select" aria-describedby="session-hint"><option value="">All sessions</option></select>
-      </label>
-      <div class="header-actions">
-        <span id="connection-status" data-testid="connection-status" class="status" role="status">Connecting</span>
-        <button id="refresh" type="button">Refresh</button>
-      </div>
-    </header>
-    <div id="notice" class="notice" role="status" hidden></div>
-    <div class="scope-tools">
-      <details class="picker-tools">
-        <summary>Find / filter sessions</summary>
-        <div class="filters">
-          <label for="session-search">Find a session<input id="session-search" type="search" placeholder="Agent or session ID" autocomplete="off" spellcheck="false" maxlength="256"></label>
-          <label for="session-filter">Show<select id="session-filter"><option value="recent">Active &amp; recent</option><option value="active">Active only</option></select></label>
-        </div>
-        <p id="session-hint" class="muted small">Sessions are discovered from gateway traffic, including remote agents.</p>
-        <p id="storage-note" class="muted small" hidden>Selection is kept in this frame only. Magpie’s sandbox blocks browser storage; reopening the page starts with All sessions.</p>
-      </details>
-      <label class="checkbox" for="include-children"><input id="include-children" type="checkbox" disabled> Include child/subagent traffic</label>
-      <button id="all-sessions" type="button" class="quiet">All sessions</button>
-    </div>
-
-    <section class="routes-section" aria-labelledby="routes-heading">
-      <div class="section-heading stage-heading">
-        <div><h2 id="routes-heading">Observed routing</h2><p id="scope-label" class="muted">All sessions · direct traffic</p></div>
-        <button id="clear-focus" class="quiet" type="button" hidden>Show scope routes</button>
-      </div>
-      <div id="route-graph" class="route-graph" data-testid="routing-stage" aria-label="Session-scoped routing paths">
-        <svg id="route-wires" class="route-wires" aria-hidden="true"></svg>
-        <svg id="route-hit-area" class="route-hit-area" aria-hidden="true"></svg>
-        <div id="route-sources" class="route-sources"></div>
-        <div id="route-hub" class="route-hub" data-testid="routing-hub">
-          <svg class="hub-bird" viewBox="0 0 48 48" aria-hidden="true"><path d="M5 34 17 23 12 9 27 20Q31 13 36 17L44 19 37 23Q36 34 27 36L18 32 6 40 11 31Z"/><path class="bird-belly" d="M20 26Q25 30 34 25 31 35 24 33Z"/></svg>
-          <strong>magpie</strong><small>Gateway</small><span id="hub-context">Observed routes</span>
-        </div>
-        <ul id="route-destinations" class="route-destinations"></ul>
-        <svg id="route-sky" class="route-sky" aria-hidden="true"></svg>
-        <p id="stage-empty" class="empty">Waiting for the service. No traffic is assumed.</p>
-      </div>
-      <p id="stage-inspection" class="stage-inspection" data-testid="stage-inspection">Select a request or destination to inspect its recorded route.</p>
-      <ul class="legend" aria-label="Route states">
-        <li><span class="state-symbol state-candidate" aria-hidden="true"></span>Candidate</li>
-        <li><span class="state-symbol state-attempting" aria-hidden="true"></span>Attempting</li>
-        <li><span class="state-symbol state-success" aria-hidden="true"></span>Success</li>
-        <li><span class="state-symbol state-failed" aria-hidden="true"></span>Failed</li>
-      </ul>
-      <div class="stage-footer"><p id="graph-note" class="muted small">Recent trace · waiting for evidence</p><button id="show-more-routes" class="quiet" type="button" hidden>View all records</button></div>
-
-      <details id="evidence-details" data-testid="evidence-details">
-        <summary>Details <span class="muted">Requests, measurements &amp; history</span></summary>
-        <div class="evidence-body">
-          <div class="history-tools"><label for="period-select">Coverage<select id="period-select"><option value="live">Live trace</option><option value="today">Today</option><option value="7d">7 days</option><option value="30d">30 days</option></select></label><p id="last-updated" class="muted small">No gateway update received yet.</p></div>
-          <section aria-labelledby="summary-heading">
-            <h2 id="summary-heading">Scope summary</h2>
-            <p id="coverage" data-testid="coverage" class="coverage">Coverage is not available until the service answers.</p>
-            <dl id="metrics" class="metrics" aria-describedby="coverage"></dl>
-            <p id="measurement-note" class="muted small">Unknown values are shown as —. Active means an unfinished gateway request, not an agent’s overall task.</p>
-          </section>
-          <section id="focused-evidence" aria-label="Focused route evidence" hidden></section>
-          <div id="replay-controls" class="replay-controls" hidden>
-            <button id="replay-prev" type="button">Previous attempt</button><span id="replay-status" role="status"></span>
-            <button id="replay-next" type="button">Next attempt</button><button id="replay-exit" type="button" class="quiet">Exit replay</button>
-          </div>
-          <section aria-labelledby="requests-heading">
-            <div class="section-heading"><h2 id="requests-heading">Request timeline</h2><span id="request-count" class="muted"></span></div>
-            <p class="muted small">Newest first. Expand for candidates and ordered attempts. Retry = same candidate; fallback = different candidate. Historical usage does not reconstruct a trace.</p>
-            <div id="request-list" class="request-list" tabindex="-1"><p class="empty">No snapshot loaded.</p></div>
-            <div class="pagination"><span id="pagination-status" class="muted"></span><button id="load-more" type="button" hidden>Load older requests</button></div>
-          </section>
-        </div>
-      </details>
-    </section>
-    <footer>Read-only metadata. No prompts, response bodies or credentials. Routing settings remain on the original Routing page.</footer>
-    <noscript>Enable JavaScript to inspect Session Routing telemetry.</noscript>
-  </main>
+<body class="window web">
+  <noscript>Enable JavaScript to view Session Routing.</noscript>
 </body>
 </html>

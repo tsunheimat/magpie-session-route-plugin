@@ -225,6 +225,27 @@ try {
     assert.equal(fallback.attempts[0].status, 429);
     record('two native Claude sessions isolated during three simultaneous requests');
     record('actual 429-to-success fallback belongs only to Session A');
+    const native = await until('native-stage projection', () => api('api/native-routing'), value =>
+      value.status === 200 && value.body.routes?.length === 3);
+    assert.equal(native.body.object, 'trace');
+    assert.deepEqual(native.body.routes.map(r => r.session).sort(), ['session-alpha', 'session-alpha', 'session-bravo']);
+    const shared = native.body.routes.filter(r => r.order.some(s => s.model === 'm'));
+    const sharedIds = shared.flatMap(r => r.order.filter(s => s.model === 'm').map(s => s.id));
+    assert(sharedIds.length > new Set(sharedIds).size, 'actual trace account handles are shared across requests');
+    for (const secret of [token, providerKey, 'synthetic-private-prompt', 'synthetic-local-reply', 'synthetic-private-upstream-error']) {
+      assert(!JSON.stringify(native.body).includes(secret), 'native stage cannot disclose private trace fields');
+    }
+    assert.equal((await api('api/native-routing?session=anything')).status, 400);
+    assert.equal((await request(new URL('api/native-routing', service).href)).status, 401);
+    assert.equal((await api('api/native-routing', { Origin: 'https://foreign.invalid' })).status, 403);
+    for (const pathname of ['vendor/magpie/client.js', 'vendor/magpie/native-helpers.js', 'vendor/magpie/routing.css', 'vendor/magpie/icons/claudecode-color.svg']) {
+      assert.equal((await request(new URL(pathname, service).href)).status, 200, pathname);
+    }
+    for (const pathname of ['vendor/magpie/upstream/app.js', 'vendor/magpie/test-only/client.baseline.js', 'vendor/magpie/source-manifest.json']) {
+      assert.equal((await request(new URL(pathname, service).href)).status, 404, pathname);
+    }
+    assert(!document.headers['content-security-policy'].includes('allow-same-origin'));
+    record('actual Bun native-stage endpoint: sanitized shared seats, fixed query, authorization and exact static surface');
     held = false; for (const release of [...waiting]) release();
     for (const response of await Promise.all([alpha, bravo, alpha2])) assert.equal(response.status, 200);
     for (const response of await Promise.all([send('session-alpha', { agent: 'codex' }), send(null)])) assert.equal(response.status, 200);

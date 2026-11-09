@@ -1,0 +1,1916 @@
+{
+  "revision": "3f53fa1f316330b77e5ff6d065a7a56980cafda2",
+  "version": "0.1.3124",
+  "license": "MIT",
+  "upstream": "https://github.com/yetone/magpie",
+  "files": [
+    {
+      "path": "LICENSE",
+      "snapshot": "upstream/LICENSE",
+      "sha256": "79d2c8444715d4bc453ec4f8a0aaf2051a4c1ee5ac08f5bd2e5848aef87c7572",
+      "bytes": 1063
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES",
+      "snapshot": "upstream/THIRD_PARTY_NOTICES",
+      "sha256": "7367c36421134228559c2d1dd8305da757dd08bacc5d620cd36b65b355dcb7e3",
+      "bytes": 21587
+    },
+    {
+      "path": "docs/reference.md",
+      "snapshot": "upstream/docs/reference.md",
+      "sha256": "f94a6db36fc7ac62915af3b420f284a5eb3e3b06a8a353eb8cd777e61dc20b76",
+      "bytes": 253723
+    },
+    {
+      "path": "internal/gui/assets/app.js",
+      "snapshot": "upstream/app.js",
+      "sha256": "3a2086d3b588acbee0881f0d6340aee9a14d5d50f510cdf2d72e1ed442b9f122",
+      "bytes": 1311072
+    },
+    {
+      "path": "internal/gui/assets/app.css",
+      "snapshot": "upstream/app.css",
+      "sha256": "c9c7e6377e7d8d1d0b6eda1b202421794d6e13ac4803cac5def5532c733e9b2c",
+      "bytes": 406191
+    },
+    {
+      "path": "internal/gui/assets/index.html",
+      "snapshot": "upstream/index.html",
+      "sha256": "f88c06143a3204b82c23fdf5dc4bf5eafed4e1880a40fb1ee0ff8c316b62cf20",
+      "bytes": 45691
+    },
+    {
+      "path": "internal/gui/assets/i18n.js",
+      "snapshot": "upstream/i18n.js",
+      "sha256": "cd1aac767558f08960c2176da05930f458f9fc8f9b4a54c66475f5a2c93514e1",
+      "bytes": 2214679
+    },
+    {
+      "path": "internal/gui/assets/kernel.js",
+      "snapshot": "upstream/kernel.js",
+      "sha256": "27229ec6064198964bca0bca66ac0059e09646ef9243adefe8677df402b5fa46",
+      "bytes": 10755
+    },
+    {
+      "path": "internal/gui/assets/purposes.js",
+      "snapshot": "upstream/purposes.js",
+      "sha256": "da4bbbc979033606347140888844db3bd725f71430f1f82d17f9b82c164c9fca",
+      "bytes": 2047
+    },
+    {
+      "path": "internal/gui/assets/plugins/routing/client.js",
+      "snapshot": "upstream/plugins/routing/client.js",
+      "sha256": "9ff41ecef0d5b96cd85f658a6b0aff1fe7efde9f52b58e0e2b3f8fad9f31a8af",
+      "bytes": 521102
+    },
+    {
+      "path": "internal/gui/assets/plugins/routing/routing.css",
+      "snapshot": "upstream/plugins/routing/routing.css",
+      "sha256": "3c2975dca40f25130fcece52cfd4720f787a7d3c9f238b2aef4fcf091fe3b480",
+      "bytes": 90876
+    },
+    {
+      "path": "internal/gui/assets/plugins/routing/i18n.js",
+      "snapshot": "upstream/plugins/routing/i18n.js",
+      "sha256": "e228006e2e0b904f17a495a1ca83cc18268fd1a0dba75d47a941bea276e26220",
+      "bytes": 464684
+    },
+    {
+      "path": "internal/gui/assets/icons/ai21.svg",
+      "snapshot": "upstream/icons/ai21.svg",
+      "sha256": "6c80f2c0d8b11d1bee179666049b00e0ab7f58f5ee8c307ca0dd3327bb49f282",
+      "bytes": 1235
+    },
+    {
+      "path": "internal/gui/assets/icons/ai302-color.svg",
+      "snapshot": "upstream/icons/ai302-color.svg",
+      "sha256": "35ede625cfc22335fc9b252e96dc7992e4e08a399bb7a714f8570f6779d19e11",
+      "bytes": 1484
+    },
+    {
+      "path": "internal/gui/assets/icons/ai360-color.svg",
+      "snapshot": "upstream/icons/ai360-color.svg",
+      "sha256": "59366fe04a4336518b8277b430f4a464a91e7ec944c9cf6f40a945c74002386d",
+      "bytes": 3226
+    },
+    {
+      "path": "internal/gui/assets/icons/aihubmix-color.svg",
+      "snapshot": "upstream/icons/aihubmix-color.svg",
+      "sha256": "e0ba11dd4b14fce9df434604cb081749b8f3347392d263d7d6f291b81f113f7f",
+      "bytes": 1441
+    },
+    {
+      "path": "internal/gui/assets/icons/aionui.svg",
+      "snapshot": "upstream/icons/aionui.svg",
+      "sha256": "1af43a74298a313c8fd24589e60597a5164c8993724318d8fdedae1d48fc0435",
+      "bytes": 425
+    },
+    {
+      "path": "internal/gui/assets/icons/air.svg",
+      "snapshot": "upstream/icons/air.svg",
+      "sha256": "0c9b8537c6fa46f17752eecd1897513ca66785e5946189e3c4f7089bda5908db",
+      "bytes": 19427
+    },
+    {
+      "path": "internal/gui/assets/icons/alibaba-color.svg",
+      "snapshot": "upstream/icons/alibaba-color.svg",
+      "sha256": "48ee796c5b1da5f5f11dbd70c5c64a3f7efcb9eeb9022ae687d81fc813e942ee",
+      "bytes": 1407
+    },
+    {
+      "path": "internal/gui/assets/icons/alibabacloud-color.svg",
+      "snapshot": "upstream/icons/alibabacloud-color.svg",
+      "sha256": "73ea97baf919edb3d888a77cd45b21574e190a80124a59e199ea6953a28a959c",
+      "bytes": 656
+    },
+    {
+      "path": "internal/gui/assets/icons/alma.png",
+      "snapshot": "upstream/icons/alma.png",
+      "sha256": "4cca00f442597907a4eab7cd395b50050f953d22740ab44151580f3b909a23cf",
+      "bytes": 4573
+    },
+    {
+      "path": "internal/gui/assets/icons/anthropic.svg",
+      "snapshot": "upstream/icons/anthropic.svg",
+      "sha256": "e833fdfa7e7187a86a05b870925067556a506dcd4239089aed73e1e58c9366a3",
+      "bytes": 368
+    },
+    {
+      "path": "internal/gui/assets/icons/antigravity-color.svg",
+      "snapshot": "upstream/icons/antigravity-color.svg",
+      "sha256": "652128cf55a28bb958563ee372d0bd00208d9e6fd446f523f77aafd811eef8ca",
+      "bytes": 7634
+    },
+    {
+      "path": "internal/gui/assets/icons/anyscale-color.svg",
+      "snapshot": "upstream/icons/anyscale-color.svg",
+      "sha256": "c0d5ba61c5248bee216d12dbbecbfdb9e8ac5a8e4718d4345794d61ae5929917",
+      "bytes": 627
+    },
+    {
+      "path": "internal/gui/assets/icons/app-alma.png",
+      "snapshot": "upstream/icons/app-alma.png",
+      "sha256": "4cca00f442597907a4eab7cd395b50050f953d22740ab44151580f3b909a23cf",
+      "bytes": 4573
+    },
+    {
+      "path": "internal/gui/assets/icons/app-cc-switch.png",
+      "snapshot": "upstream/icons/app-cc-switch.png",
+      "sha256": "dc6f20e8fb90d788c456baab6ee9533b094676545e47d002dc80448a77545f14",
+      "bytes": 5265
+    },
+    {
+      "path": "internal/gui/assets/icons/apple-touch-icon.png",
+      "snapshot": "upstream/icons/apple-touch-icon.png",
+      "sha256": "4132975efe9fe2ff481ab3e5dd9df5d811b9af5095f353ebb391d98c0f95aad4",
+      "bytes": 10157
+    },
+    {
+      "path": "internal/gui/assets/icons/aside.svg",
+      "snapshot": "upstream/icons/aside.svg",
+      "sha256": "4ae469ccad9f800880252bb6915c8c9953e59a5f09526739e5b8a3da9e06fc1d",
+      "bytes": 11092
+    },
+    {
+      "path": "internal/gui/assets/icons/astrbot.svg",
+      "snapshot": "upstream/icons/astrbot.svg",
+      "sha256": "c6581e461286507eeff086fad3485c39c19c014a23b7835a830ac15a1d2fb0e0",
+      "bytes": 922
+    },
+    {
+      "path": "internal/gui/assets/icons/atomcode.png",
+      "snapshot": "upstream/icons/atomcode.png",
+      "sha256": "033e3cb2effe16e88e74c0b4b7221e3c742036c2052ae2d9ead17e53022b33b0",
+      "bytes": 14059
+    },
+    {
+      "path": "internal/gui/assets/icons/aws.svg",
+      "snapshot": "upstream/icons/aws.svg",
+      "sha256": "f73f2506defea5df3b064bcea998339e183c4f979b2bb4af4fcbf42c29ae151c",
+      "bytes": 3234
+    },
+    {
+      "path": "internal/gui/assets/icons/azure-color.svg",
+      "snapshot": "upstream/icons/azure-color.svg",
+      "sha256": "abc639d094593943c1b201270f4903c74d02d2e26acf26abf592a29c222c5181",
+      "bytes": 1621
+    },
+    {
+      "path": "internal/gui/assets/icons/azureai-color.svg",
+      "snapshot": "upstream/icons/azureai-color.svg",
+      "sha256": "89bef85d67f45984dba85f8d7e6a8ed91585f706c43f7236a89590d8f4940fde",
+      "bytes": 2606
+    },
+    {
+      "path": "internal/gui/assets/icons/baichuan-color.svg",
+      "snapshot": "upstream/icons/baichuan-color.svg",
+      "sha256": "7d49311206402734850ed9dc112759780429bb363dcee31eccb5a92f428532a6",
+      "bytes": 571
+    },
+    {
+      "path": "internal/gui/assets/icons/baidu-color.svg",
+      "snapshot": "upstream/icons/baidu-color.svg",
+      "sha256": "1059750a2069aec6080ff48732931e87a99bd3d22db3e8471cebe255b6014b75",
+      "bytes": 1384
+    },
+    {
+      "path": "internal/gui/assets/icons/baiducloud-color.svg",
+      "snapshot": "upstream/icons/baiducloud-color.svg",
+      "sha256": "2269f4c82a3a810f42691c82d0d5086961c2b684a2dcc1e7523cd9f8564e2f35",
+      "bytes": 717
+    },
+    {
+      "path": "internal/gui/assets/icons/bailian-color.svg",
+      "snapshot": "upstream/icons/bailian-color.svg",
+      "sha256": "5cc26dc961b2ecd0912f4e023c8ce745bcc52ac45b1c4baeadd7201f6b60de25",
+      "bytes": 1353
+    },
+    {
+      "path": "internal/gui/assets/icons/baseten.svg",
+      "snapshot": "upstream/icons/baseten.svg",
+      "sha256": "d560883f6df500c1290b2fb2018836d853c72697c1fc252793538fabf53ff28d",
+      "bytes": 559
+    },
+    {
+      "path": "internal/gui/assets/icons/bedrock-color.svg",
+      "snapshot": "upstream/icons/bedrock-color.svg",
+      "sha256": "a149a5678ce2b5d821759aabca7b815867027a8231a76723b3673580e8177a60",
+      "bytes": 2270
+    },
+    {
+      "path": "internal/gui/assets/icons/burncloud-color.svg",
+      "snapshot": "upstream/icons/burncloud-color.svg",
+      "sha256": "d51a3c8049a0a6e20fb1b33a249aced927a8682e568b61d4b83d1ccdfc0be01b",
+      "bytes": 997
+    },
+    {
+      "path": "internal/gui/assets/icons/bytedance-color.svg",
+      "snapshot": "upstream/icons/bytedance-color.svg",
+      "sha256": "3d37647be262c79b044e293bb1a4993202537e9f9ffdbd2bbe7e9fc5378d1005",
+      "bytes": 953
+    },
+    {
+      "path": "internal/gui/assets/icons/cerebras.svg",
+      "snapshot": "upstream/icons/cerebras.svg",
+      "sha256": "05af9593eca3fefdb30c5ad042040f008beea2b27e0a6b7315c319492f7a44ff",
+      "bytes": 1235
+    },
+    {
+      "path": "internal/gui/assets/icons/chatglm-color.svg",
+      "snapshot": "upstream/icons/chatglm-color.svg",
+      "sha256": "6e935f6ccad7a776edef259b33bbbfe5b51d6486318d4a0f423708ffe2a27287",
+      "bytes": 2485
+    },
+    {
+      "path": "internal/gui/assets/icons/cherryin-color.svg",
+      "snapshot": "upstream/icons/cherryin-color.svg",
+      "sha256": "821d057bdb2707ab4c48d1372e91c4930403bd4ee5d75452d45b18715af37666",
+      "bytes": 260
+    },
+    {
+      "path": "internal/gui/assets/icons/chutes.svg",
+      "snapshot": "upstream/icons/chutes.svg",
+      "sha256": "b1827890cee5c1e68caba645e60c1b263e9993b266739100efba6458a980a37f",
+      "bytes": 772
+    },
+    {
+      "path": "internal/gui/assets/icons/cindy.png",
+      "snapshot": "upstream/icons/cindy.png",
+      "sha256": "fd7ad23096a2e968a23d3ea9ad30b954705870c6ffa10a3695dd45820f08b2a1",
+      "bytes": 8102
+    },
+    {
+      "path": "internal/gui/assets/icons/claude-color.svg",
+      "snapshot": "upstream/icons/claude-color.svg",
+      "sha256": "a3101f3047a119aa11825ad9369510f0c472428c8c52d420e31bc62db44a8364",
+      "bytes": 1696
+    },
+    {
+      "path": "internal/gui/assets/icons/claudecode-color.svg",
+      "snapshot": "upstream/icons/claudecode-color.svg",
+      "sha256": "670b3d8d749d0815ad8f7e62a59d51cb5e2053cb19403f3541a8aed7036a877f",
+      "bytes": 424
+    },
+    {
+      "path": "internal/gui/assets/icons/cline.svg",
+      "snapshot": "upstream/icons/cline.svg",
+      "sha256": "9003d2cdce82b016147b732abb4def60af55c348ba2cea2ba0b69a3c7d159b19",
+      "bytes": 750
+    },
+    {
+      "path": "internal/gui/assets/icons/cloudflare-color.svg",
+      "snapshot": "upstream/icons/cloudflare-color.svg",
+      "sha256": "cee35d3f0ecb7925ce0a89aeaff8b907cadae7c3fe44a23e4001cc8d5ee57502",
+      "bytes": 1073
+    },
+    {
+      "path": "internal/gui/assets/icons/codebuddy-color.svg",
+      "snapshot": "upstream/icons/codebuddy-color.svg",
+      "sha256": "033d5da624460e686046f22b4e242b6b86484ad84ec4877e4efa15a9fb642b97",
+      "bytes": 1589
+    },
+    {
+      "path": "internal/gui/assets/icons/codex-color.svg",
+      "snapshot": "upstream/icons/codex-color.svg",
+      "sha256": "4a2f43ce46b5b6e3722c95088f88d26ef91e6a8c2e598e70642a1c54367386e4",
+      "bytes": 1769
+    },
+    {
+      "path": "internal/gui/assets/icons/cohere-color.svg",
+      "snapshot": "upstream/icons/cohere-color.svg",
+      "sha256": "84d0ee3cbe66f030e5a18cb2c86da9166ab2137c7a98781693bb1fbf31e392b9",
+      "bytes": 769
+    },
+    {
+      "path": "internal/gui/assets/icons/cometapi-color.svg",
+      "snapshot": "upstream/icons/cometapi-color.svg",
+      "sha256": "069903c78f5f468da16bfb82ed1de0f74030904183f764b71deb0c7e94213c23",
+      "bytes": 1308
+    },
+    {
+      "path": "internal/gui/assets/icons/commandcode.svg",
+      "snapshot": "upstream/icons/commandcode.svg",
+      "sha256": "472cf8f2f7a62ca5ee79e146aa7cb8ac34b26ae33446e5fd32572d7206540f34",
+      "bytes": 2849
+    },
+    {
+      "path": "internal/gui/assets/icons/copilot-color.svg",
+      "snapshot": "upstream/icons/copilot-color.svg",
+      "sha256": "04f15d0556fbac10a4e0f82d1560610db8b33cd04780a4f24ad3b91c4abd278d",
+      "bytes": 3569
+    },
+    {
+      "path": "internal/gui/assets/icons/coze.svg",
+      "snapshot": "upstream/icons/coze.svg",
+      "sha256": "bd0dce025396aecf8091ada8de90a0fbf5f0fa923f5ede9f3320e9bf990bc868",
+      "bytes": 866
+    },
+    {
+      "path": "internal/gui/assets/icons/crush.png",
+      "snapshot": "upstream/icons/crush.png",
+      "sha256": "76167b40452da7da049779bf3b6e6211af406e9a9748c146a1d9bdacfbf7c504",
+      "bytes": 16519
+    },
+    {
+      "path": "internal/gui/assets/icons/curl.svg",
+      "snapshot": "upstream/icons/curl.svg",
+      "sha256": "c37cfad781cc0b3df5fba385820cba9ca95488cfa5ea04af47c187fc3bd93bad",
+      "bytes": 1923
+    },
+    {
+      "path": "internal/gui/assets/icons/cursor.svg",
+      "snapshot": "upstream/icons/cursor.svg",
+      "sha256": "0cb51bddf264ae108926fd554c063ef40fc1aac3c5c921ddb39ad184e4e5d0ef",
+      "bytes": 547
+    },
+    {
+      "path": "internal/gui/assets/icons/deepinfra-color.svg",
+      "snapshot": "upstream/icons/deepinfra-color.svg",
+      "sha256": "bfc78853fe658f6446651d03218f3e809215fd7cb3bce841a6526de383286544",
+      "bytes": 3415
+    },
+    {
+      "path": "internal/gui/assets/icons/deepmind-color.svg",
+      "snapshot": "upstream/icons/deepmind-color.svg",
+      "sha256": "f19b4db1fcf8660ab53743416262ee29e84856f5904c640aab1ded9c27e070bc",
+      "bytes": 820
+    },
+    {
+      "path": "internal/gui/assets/icons/deepseek-color.svg",
+      "snapshot": "upstream/icons/deepseek-color.svg",
+      "sha256": "deba5f98a5c1796e20fcac3149bcd7eb8a32f0bdd04d048819400b1f28bd1439",
+      "bytes": 2164
+    },
+    {
+      "path": "internal/gui/assets/icons/deveco-color.svg",
+      "snapshot": "upstream/icons/deveco-color.svg",
+      "sha256": "c2d531fd8fbfacdc034d25f122b117693efdb1695c7eddfa1076a0ae667d36b6",
+      "bytes": 818
+    },
+    {
+      "path": "internal/gui/assets/icons/devin.svg",
+      "snapshot": "upstream/icons/devin.svg",
+      "sha256": "8d197b0c31522517ffa896cd4a1ee65719eb73bff9eb9bbf7edf64db6b1a573d",
+      "bytes": 3302
+    },
+    {
+      "path": "internal/gui/assets/icons/doubao-color.svg",
+      "snapshot": "upstream/icons/doubao-color.svg",
+      "sha256": "3cd31ba03ae44b8c29561597a3b863809efecb13fcdfd08407a086df86a69b55",
+      "bytes": 1153
+    },
+    {
+      "path": "internal/gui/assets/icons/empryo-color.svg",
+      "snapshot": "upstream/icons/empryo-color.svg",
+      "sha256": "de842ec0c3a379d4a941348cf9ed27ef7b0b5320ec5cc940826aec23e45e81fa",
+      "bytes": 2925
+    },
+    {
+      "path": "internal/gui/assets/icons/factory.svg",
+      "snapshot": "upstream/icons/factory.svg",
+      "sha256": "6a502c844029a326e77aff6554210629ee3e735d81ae42d2b98be0eb20c48bf3",
+      "bytes": 6046
+    },
+    {
+      "path": "internal/gui/assets/icons/favicon.svg",
+      "snapshot": "upstream/icons/favicon.svg",
+      "sha256": "4783af97c8dd94c61b8b499d38c1505e9efeee787e76f21892570553393d33a9",
+      "bytes": 5043
+    },
+    {
+      "path": "internal/gui/assets/icons/featherless-color.svg",
+      "snapshot": "upstream/icons/featherless-color.svg",
+      "sha256": "45efbd887b9cfbef1bcef24c202df762ea2fa71a8fa5d96903cdad72a23a0965",
+      "bytes": 987
+    },
+    {
+      "path": "internal/gui/assets/icons/fireworks-color.svg",
+      "snapshot": "upstream/icons/fireworks-color.svg",
+      "sha256": "f1c4782b86bc03a36323fd68ad6cc376c6b2ebe57b701cc958ebd6b8d37effd6",
+      "bytes": 592
+    },
+    {
+      "path": "internal/gui/assets/icons/friendli.svg",
+      "snapshot": "upstream/icons/friendli.svg",
+      "sha256": "0ea6e5b955988d330951c463ea99babb3292e9859008cf8b66c85bf853d4a4aa",
+      "bytes": 1473
+    },
+    {
+      "path": "internal/gui/assets/icons/fx.svg",
+      "snapshot": "upstream/icons/fx.svg",
+      "sha256": "1c8fec7bd6cb8931a812e730824e738ca19f211cc956324c9139c95c7858d52c",
+      "bytes": 1063
+    },
+    {
+      "path": "internal/gui/assets/icons/gemini-color.svg",
+      "snapshot": "upstream/icons/gemini-color.svg",
+      "sha256": "8ab0a9bafec11f7e69bcb9fc4ffd8f1bc927d1ddcbbb6ff36dee5ae8b5a9d602",
+      "bytes": 2836
+    },
+    {
+      "path": "internal/gui/assets/icons/geminicli-color.svg",
+      "snapshot": "upstream/icons/geminicli-color.svg",
+      "sha256": "c2f54ebaa4c3b9191c6a07f7b0c66bc78e4abe486003dc564469cf650672663e",
+      "bytes": 921
+    },
+    {
+      "path": "internal/gui/assets/icons/gemma-color.svg",
+      "snapshot": "upstream/icons/gemma-color.svg",
+      "sha256": "8cdc48e35113d2f76f602fc93977ce8b8eebe41bc66a65f532ed9c89f6a68e2d",
+      "bytes": 2368
+    },
+    {
+      "path": "internal/gui/assets/icons/giteeai.svg",
+      "snapshot": "upstream/icons/giteeai.svg",
+      "sha256": "bff2da7cbd9839118593bb79b30fa2342425005024e06a8e1d46a4b9a123acda",
+      "bytes": 1391
+    },
+    {
+      "path": "internal/gui/assets/icons/github.svg",
+      "snapshot": "upstream/icons/github.svg",
+      "sha256": "1bd763b5d53ab1618e0afce72aacffc7e93d1249c395f713b3b055c087526625",
+      "bytes": 907
+    },
+    {
+      "path": "internal/gui/assets/icons/githubcopilot.svg",
+      "snapshot": "upstream/icons/githubcopilot.svg",
+      "sha256": "bbc7fddc13448236e5edea8c399d2072dc40aa5da5bca07f7a2f412405c500a3",
+      "bytes": 2019
+    },
+    {
+      "path": "internal/gui/assets/icons/glama.svg",
+      "snapshot": "upstream/icons/glama.svg",
+      "sha256": "ab2513d6b0833fbbe7d4106cbdf6ab5c570f312f2172c49363aabee3c57739b2",
+      "bytes": 7901
+    },
+    {
+      "path": "internal/gui/assets/icons/gmicloud.svg",
+      "snapshot": "upstream/icons/gmicloud.svg",
+      "sha256": "22b0d7150d3d04fc8a498ab5de03c130b25127910c356660df913f2f769d4f61",
+      "bytes": 886
+    },
+    {
+      "path": "internal/gui/assets/icons/google-color.svg",
+      "snapshot": "upstream/icons/google-color.svg",
+      "sha256": "4e6aa8892ef15a6b431f40f2c9045979bf7e2357524e7bbb89b353cf4f32a5ac",
+      "bytes": 920
+    },
+    {
+      "path": "internal/gui/assets/icons/googlecloud-color.svg",
+      "snapshot": "upstream/icons/googlecloud-color.svg",
+      "sha256": "c0faf37b180dfc1efe12440c039047b0e1c60a3c424cca6616e580f6f219a7dc",
+      "bytes": 925
+    },
+    {
+      "path": "internal/gui/assets/icons/goose.svg",
+      "snapshot": "upstream/icons/goose.svg",
+      "sha256": "8779d9a61c5b0be78a3d36cab6843ba5af86218ba2ff1b18eb918c7a8d25bb99",
+      "bytes": 1807
+    },
+    {
+      "path": "internal/gui/assets/icons/grok.svg",
+      "snapshot": "upstream/icons/grok.svg",
+      "sha256": "9175fc90c22655160231976c849f25a03b888d7cc0e04c5f1b987b659bb07c95",
+      "bytes": 756
+    },
+    {
+      "path": "internal/gui/assets/icons/groq.svg",
+      "snapshot": "upstream/icons/groq.svg",
+      "sha256": "078d5cf6e7a54905040c15ddacf5ea33c13042fe7739e820cedc2096e4406651",
+      "bytes": 568
+    },
+    {
+      "path": "internal/gui/assets/icons/hanako.png",
+      "snapshot": "upstream/icons/hanako.png",
+      "sha256": "f899034194797adb3f4b266724d922a0b8c60956e9e79d2391efa44ea0b9fe25",
+      "bytes": 21062
+    },
+    {
+      "path": "internal/gui/assets/icons/hermes.svg",
+      "snapshot": "upstream/icons/hermes.svg",
+      "sha256": "8250f008f40c5184079cbe6d44b48f83f4e5de4d7318e1d6a906b9b08355229c",
+      "bytes": 284
+    },
+    {
+      "path": "internal/gui/assets/icons/huawei-color.svg",
+      "snapshot": "upstream/icons/huawei-color.svg",
+      "sha256": "ca9af4229ba3d538811cad7939b5f3f9edc87ec9448eae579506c659cd133d4a",
+      "bytes": 1481
+    },
+    {
+      "path": "internal/gui/assets/icons/huaweicloud-color.svg",
+      "snapshot": "upstream/icons/huaweicloud-color.svg",
+      "sha256": "8a5e4cb6452046ecaf3a500e3a89955efdf54bfd0bed46a9c364fbd5f13290e4",
+      "bytes": 1486
+    },
+    {
+      "path": "internal/gui/assets/icons/huggingface-color.svg",
+      "snapshot": "upstream/icons/huggingface-color.svg",
+      "sha256": "5d39d66bb6c9b026d3cb5de7bd9978dad3906570df2aca8f00078a6f8a3d0f5e",
+      "bytes": 3768
+    },
+    {
+      "path": "internal/gui/assets/icons/hunyuan-color.svg",
+      "snapshot": "upstream/icons/hunyuan-color.svg",
+      "sha256": "510e7bb438506b5aadfaf8b9551d1606efd5b4171161a64a64204c72a453658a",
+      "bytes": 1115
+    },
+    {
+      "path": "internal/gui/assets/icons/hyperbolic-color.svg",
+      "snapshot": "upstream/icons/hyperbolic-color.svg",
+      "sha256": "459ebd5a986f2ba3dded01c29b97fb708893064ba64f5aa2131fd9690b32f503",
+      "bytes": 1272
+    },
+    {
+      "path": "internal/gui/assets/icons/icon-512.png",
+      "snapshot": "upstream/icons/icon-512.png",
+      "sha256": "bbcca85e90510c99959bd69d30d0fffe33b819564ad0706b434d60cbcb167741",
+      "bytes": 34716
+    },
+    {
+      "path": "internal/gui/assets/icons/iflytekcloud-color.svg",
+      "snapshot": "upstream/icons/iflytekcloud-color.svg",
+      "sha256": "0012c7c24cf8d987a9e2fd17e9b555ff8082e4a7369b3e57dc0a827146bb0868",
+      "bytes": 1149
+    },
+    {
+      "path": "internal/gui/assets/icons/inference.svg",
+      "snapshot": "upstream/icons/inference.svg",
+      "sha256": "289a6a94c69929eb55a47ddc5652fbdfa2b60a0914cdddf5ed432f978fbc080c",
+      "bytes": 348
+    },
+    {
+      "path": "internal/gui/assets/icons/infinigence-color.svg",
+      "snapshot": "upstream/icons/infinigence-color.svg",
+      "sha256": "4b9f3e7da2bfa38bfad46906c821520d6dfc36f77886d746a4b40a0cc9b60f84",
+      "bytes": 314
+    },
+    {
+      "path": "internal/gui/assets/icons/internlm-color.svg",
+      "snapshot": "upstream/icons/internlm-color.svg",
+      "sha256": "0e84741d3fb76e65fd86a57d18b6e31f31fa2e6156166c4bfa2487db894221a6",
+      "bytes": 8151
+    },
+    {
+      "path": "internal/gui/assets/icons/jcode.svg",
+      "snapshot": "upstream/icons/jcode.svg",
+      "sha256": "d4e154f651de391dc06bad01266c547af48ae8ddc436757fa087289f4e5ae3ad",
+      "bytes": 12514
+    },
+    {
+      "path": "internal/gui/assets/icons/jina.svg",
+      "snapshot": "upstream/icons/jina.svg",
+      "sha256": "dbb78d6217774ddde8c57a6f5c94a3294c59e99c4a1e6ec786e409648b9bdb84",
+      "bytes": 404
+    },
+    {
+      "path": "internal/gui/assets/icons/kilo.svg",
+      "snapshot": "upstream/icons/kilo.svg",
+      "sha256": "6f9583757427ed6e682edddc28cc02cf1a2b6dbc3681ffe085b505a2ddd4e224",
+      "bytes": 642
+    },
+    {
+      "path": "internal/gui/assets/icons/kilocode.svg",
+      "snapshot": "upstream/icons/kilocode.svg",
+      "sha256": "a2aef0e0bb992ebe768bfb8c3a3ab6ff2c2638448b09dd88db27877de1c07a22",
+      "bytes": 652
+    },
+    {
+      "path": "internal/gui/assets/icons/kimi-code-desktop.png",
+      "snapshot": "upstream/icons/kimi-code-desktop.png",
+      "sha256": "faad576b6c72944e63ad4891609542cac2747464365fc5095c390d68b3690283",
+      "bytes": 8357
+    },
+    {
+      "path": "internal/gui/assets/icons/kimi.svg",
+      "snapshot": "upstream/icons/kimi.svg",
+      "sha256": "ed08131b46acf70e6e2144eceb775e74098b58ea65fa21eaee04be7b05cfe63b",
+      "bytes": 786
+    },
+    {
+      "path": "internal/gui/assets/icons/kiro-color.svg",
+      "snapshot": "upstream/icons/kiro-color.svg",
+      "sha256": "4eae4d6e818da7342c32c7d443ab7c97b93c544db9af379d5b5bf7f0a3127d66",
+      "bytes": 960
+    },
+    {
+      "path": "internal/gui/assets/icons/kling-color.svg",
+      "snapshot": "upstream/icons/kling-color.svg",
+      "sha256": "a8aa4def0eb1c3ca0f0528597d28fa495249aa710aa403d3c571c47c81c6150c",
+      "bytes": 2245
+    },
+    {
+      "path": "internal/gui/assets/icons/lambda.svg",
+      "snapshot": "upstream/icons/lambda.svg",
+      "sha256": "0fda3913e9969665646d82752c785189fa07c851c90272ff93f68139d369d3b5",
+      "bytes": 350
+    },
+    {
+      "path": "internal/gui/assets/icons/leptonai-color.svg",
+      "snapshot": "upstream/icons/leptonai-color.svg",
+      "sha256": "7e74337360b476dfec2e4cf88d16971d83033d17a1c99169885a3d86672d4111",
+      "bytes": 3221
+    },
+    {
+      "path": "internal/gui/assets/icons/liquid.svg",
+      "snapshot": "upstream/icons/liquid.svg",
+      "sha256": "4727b1cbd33bd256aca5be79a7d91a4f2753b2feb0dcfbb7b9fb3f23928c2467",
+      "bytes": 524
+    },
+    {
+      "path": "internal/gui/assets/icons/liveagent-color.svg",
+      "snapshot": "upstream/icons/liveagent-color.svg",
+      "sha256": "59522259efd827b16cbfc268dd2534120614f6d31515f76702c52178cb317ce3",
+      "bytes": 6928
+    },
+    {
+      "path": "internal/gui/assets/icons/llmapi.svg",
+      "snapshot": "upstream/icons/llmapi.svg",
+      "sha256": "7e622071317ebbacd24cc4068f5ebd2c74fff5b9ba69bb8b4b081ad5eb3a4691",
+      "bytes": 1368
+    },
+    {
+      "path": "internal/gui/assets/icons/lmstudio.svg",
+      "snapshot": "upstream/icons/lmstudio.svg",
+      "sha256": "4a575e8382b52ce742ac5d21d361a7d2a08cea7c12390ee1bbb755ef7d3cc25b",
+      "bytes": 1253
+    },
+    {
+      "path": "internal/gui/assets/icons/lody.png",
+      "snapshot": "upstream/icons/lody.png",
+      "sha256": "e593417b41884ef4a69810ca8ef7894cec727a07052eba893bdf75e89726efdc",
+      "bytes": 6056
+    },
+    {
+      "path": "internal/gui/assets/icons/longcat.svg",
+      "snapshot": "upstream/icons/longcat.svg",
+      "sha256": "4f1ff7194ad6752ea48773b73c48b5de4de9d8d6ee265b7d31df8053e519182d",
+      "bytes": 804
+    },
+    {
+      "path": "internal/gui/assets/icons/magpie.svg",
+      "snapshot": "upstream/icons/magpie.svg",
+      "sha256": "988d2e57b6b87043776521220c82e6f4cdbff0a7d2785ee9416321a918ec0138",
+      "bytes": 4956
+    },
+    {
+      "path": "internal/gui/assets/icons/meta-color.svg",
+      "snapshot": "upstream/icons/meta-color.svg",
+      "sha256": "096f2bb3aa466dcb40d983967152efb7e173195c025d48a91b5f636df913082d",
+      "bytes": 2516
+    },
+    {
+      "path": "internal/gui/assets/icons/metaai-color.svg",
+      "snapshot": "upstream/icons/metaai-color.svg",
+      "sha256": "5a2c8b2c71ddb4d6a44daee712cb6be02a09a29d649d21e0af1454bc331055b5",
+      "bytes": 4546
+    },
+    {
+      "path": "internal/gui/assets/icons/microsoft-color.svg",
+      "snapshot": "upstream/icons/microsoft-color.svg",
+      "sha256": "5cfb0ffa3231313c2968b5e3fedfcce8e2e96c61bde4572384c3889a77a80350",
+      "bytes": 399
+    },
+    {
+      "path": "internal/gui/assets/icons/mimocode.svg",
+      "snapshot": "upstream/icons/mimocode.svg",
+      "sha256": "a1cf318ef84e3bba3d22886150ca45f0865ed339b3d25e858223b51db692e93d",
+      "bytes": 4572
+    },
+    {
+      "path": "internal/gui/assets/icons/minimax-color.svg",
+      "snapshot": "upstream/icons/minimax-color.svg",
+      "sha256": "7f7187fa6d9b341ac5f22f6c5a970523afb439dc45566d64eb4f4b9b604d6b01",
+      "bytes": 1570
+    },
+    {
+      "path": "internal/gui/assets/icons/mistermorph-color.svg",
+      "snapshot": "upstream/icons/mistermorph-color.svg",
+      "sha256": "8133be26416e1750cb4de082e01ad07e6cb43ad23af31acf933145461532e8fd",
+      "bytes": 13465
+    },
+    {
+      "path": "internal/gui/assets/icons/mistral-color.svg",
+      "snapshot": "upstream/icons/mistral-color.svg",
+      "sha256": "722f74b289d95486b43662fe24fa883b333701296f618406cd0ed502299170b6",
+      "bytes": 655
+    },
+    {
+      "path": "internal/gui/assets/icons/mlx-serve.png",
+      "snapshot": "upstream/icons/mlx-serve.png",
+      "sha256": "91cad40f57f19541e61867287f3bfd224808f756a7ceae37d8fefc834bb1cf63",
+      "bytes": 6386
+    },
+    {
+      "path": "internal/gui/assets/icons/modelscope-color.svg",
+      "snapshot": "upstream/icons/modelscope-color.svg",
+      "sha256": "21841ddba0c560ad44c4def00a66f2a9b31703438ba390ea0b8e01cfbf39b5e4",
+      "bytes": 632
+    },
+    {
+      "path": "internal/gui/assets/icons/monica-color.svg",
+      "snapshot": "upstream/icons/monica-color.svg",
+      "sha256": "9e36f56b2691e107773e3c86f8e6a0152886210cf216817e04dcad6964ae97a7",
+      "bytes": 833
+    },
+    {
+      "path": "internal/gui/assets/icons/moonshot.svg",
+      "snapshot": "upstream/icons/moonshot.svg",
+      "sha256": "435f41b74e6a87639b6bf860e9628f20cbe7d6229bece412d548f4cea3081852",
+      "bytes": 4028
+    },
+    {
+      "path": "internal/gui/assets/icons/morph-color.svg",
+      "snapshot": "upstream/icons/morph-color.svg",
+      "sha256": "994eb5b52da00eca9f4fa4d4c11a7fa1c1fa37dd9f58f9a97b951f0ea23a9f59",
+      "bytes": 1777
+    },
+    {
+      "path": "internal/gui/assets/icons/mothx.png",
+      "snapshot": "upstream/icons/mothx.png",
+      "sha256": "bb3763301ecb74133619157e83bae5fc3a1348edebcdeea6c50a2fd596285741",
+      "bytes": 10545
+    },
+    {
+      "path": "internal/gui/assets/icons/nebius.svg",
+      "snapshot": "upstream/icons/nebius.svg",
+      "sha256": "4213ea25ec4c782688a7dafdad4bb828096151639077001c4df9c10a315f1af1",
+      "bytes": 519
+    },
+    {
+      "path": "internal/gui/assets/icons/newapi-color.svg",
+      "snapshot": "upstream/icons/newapi-color.svg",
+      "sha256": "b54496a735b49c4e5d7d1b5f00be9f33e0e4ef3f04a7c4c167dc9209dcae334b",
+      "bytes": 2443
+    },
+    {
+      "path": "internal/gui/assets/icons/nousresearch.svg",
+      "snapshot": "upstream/icons/nousresearch.svg",
+      "sha256": "4dc3c7cdf13d2f0bdf16b872d76293f048010a00f580df68a85e1f9c4e500e5d",
+      "bytes": 19786
+    },
+    {
+      "path": "internal/gui/assets/icons/nova-color.svg",
+      "snapshot": "upstream/icons/nova-color.svg",
+      "sha256": "9dbe0c8d3c82dce1491b783300b27c0ece48f183504344dcdef0244efcde43e7",
+      "bytes": 2052
+    },
+    {
+      "path": "internal/gui/assets/icons/novita-color.svg",
+      "snapshot": "upstream/icons/novita-color.svg",
+      "sha256": "e41321ff6a421b958c7f402f11ffcf44dbcef9c703c952736bcc92c0fd6624c4",
+      "bytes": 286
+    },
+    {
+      "path": "internal/gui/assets/icons/nvidia-color.svg",
+      "snapshot": "upstream/icons/nvidia-color.svg",
+      "sha256": "8c941e4eb8b782eccaaea1240c059d20be33ab8eda28d7c9ed9b53ac802fe683",
+      "bytes": 1025
+    },
+    {
+      "path": "internal/gui/assets/icons/ollama.svg",
+      "snapshot": "upstream/icons/ollama.svg",
+      "sha256": "3a268218fb2e6e81fa31df70f70b51331625047794db81db21d35359428fae7a",
+      "bytes": 3290
+    },
+    {
+      "path": "internal/gui/assets/icons/omlx.svg",
+      "snapshot": "upstream/icons/omlx.svg",
+      "sha256": "01a73d9e908684d754ed7f0fb8d40924e0e434a3a24555b1f4dd0c964c45114a",
+      "bytes": 1229
+    },
+    {
+      "path": "internal/gui/assets/icons/omo.svg",
+      "snapshot": "upstream/icons/omo.svg",
+      "sha256": "236a0982bfca0d118f2fcbc7ebf20f2eb18cc6518bb190365c5def40eb420907",
+      "bytes": 2942
+    },
+    {
+      "path": "internal/gui/assets/icons/omp.svg",
+      "snapshot": "upstream/icons/omp.svg",
+      "sha256": "cc1e9fac8bc435b56cc57307872b64ce2793d9664df7c96aea38b0eb74d654e1",
+      "bytes": 240
+    },
+    {
+      "path": "internal/gui/assets/icons/openai.svg",
+      "snapshot": "upstream/icons/openai.svg",
+      "sha256": "a595df6b423920c67a7f8f73c063e4bfb72d415948097b6cac063a2366bb5186",
+      "bytes": 1687
+    },
+    {
+      "path": "internal/gui/assets/icons/openchamber.svg",
+      "snapshot": "upstream/icons/openchamber.svg",
+      "sha256": "c89f9fc59c3aeca07db3eebc281785dc46a1d35a7f2241671842cc1d3e91bd3e",
+      "bytes": 824
+    },
+    {
+      "path": "internal/gui/assets/icons/openclaw.svg",
+      "snapshot": "upstream/icons/openclaw.svg",
+      "sha256": "d66797894d1151ca8c8cc00ab2251a73310affa0f72bbeaca68d45d8dd751c92",
+      "bytes": 642
+    },
+    {
+      "path": "internal/gui/assets/icons/opencode.svg",
+      "snapshot": "upstream/icons/opencode.svg",
+      "sha256": "7cfa6e9d6726f7c9fa26c7d9aef0dfec52d20a137380454340f30f12ccbfd302",
+      "bytes": 235
+    },
+    {
+      "path": "internal/gui/assets/icons/openrouter.svg",
+      "snapshot": "upstream/icons/openrouter.svg",
+      "sha256": "ae671cc83de9bd45db97a47ed5e38a4e1bd9f93a12be495ba4b4f8b284026bca",
+      "bytes": 382
+    },
+    {
+      "path": "internal/gui/assets/icons/openwebui.svg",
+      "snapshot": "upstream/icons/openwebui.svg",
+      "sha256": "9cbf7a1105e51029762678e6def27b2e95fb0ec83ff7827b2c75d11aa8c3c4d7",
+      "bytes": 491
+    },
+    {
+      "path": "internal/gui/assets/icons/parasail.svg",
+      "snapshot": "upstream/icons/parasail.svg",
+      "sha256": "0083857f48835c3c4f83bc4263331cfdbebdb6e4768e200e0279c1d152972231",
+      "bytes": 444
+    },
+    {
+      "path": "internal/gui/assets/icons/penguin-color.svg",
+      "snapshot": "upstream/icons/penguin-color.svg",
+      "sha256": "f7588718ba95267ef0b59788c08613bad06e161580588801c9b95234f44ebc7b",
+      "bytes": 4639
+    },
+    {
+      "path": "internal/gui/assets/icons/perplexity-color.svg",
+      "snapshot": "upstream/icons/perplexity-color.svg",
+      "sha256": "8353f3ab20822f1a933224b0ea32cc39f0c32d5740f4af8c254b0f418e0a3a70",
+      "bytes": 603
+    },
+    {
+      "path": "internal/gui/assets/icons/phala-color.svg",
+      "snapshot": "upstream/icons/phala-color.svg",
+      "sha256": "9cfa328bd89f4038a137f8327e98a8e248649a10f87a98725a65b80602664f9d",
+      "bytes": 680
+    },
+    {
+      "path": "internal/gui/assets/icons/pi.svg",
+      "snapshot": "upstream/icons/pi.svg",
+      "sha256": "d82978781b824273c55473822c1f243a6ed34fc6e8c2dbfe1a90dfc66ae43ee8",
+      "bytes": 313
+    },
+    {
+      "path": "internal/gui/assets/icons/pipellm-color.svg",
+      "snapshot": "upstream/icons/pipellm-color.svg",
+      "sha256": "fdec7951432b5d383096b2e157e36843c884f7cffa8ad42b19579e415c73fd75",
+      "bytes": 728
+    },
+    {
+      "path": "internal/gui/assets/icons/poe.svg",
+      "snapshot": "upstream/icons/poe.svg",
+      "sha256": "d427b1abf53b3d52b30e9bf2a5756577a588fbde04640e8e1f9c688ecd4e9b51",
+      "bytes": 1627
+    },
+    {
+      "path": "internal/gui/assets/icons/ppio-color.svg",
+      "snapshot": "upstream/icons/ppio-color.svg",
+      "sha256": "a1735277c456430e099bdc397b29e817c27c3890a7d072926be3125812ce0942",
+      "bytes": 808
+    },
+    {
+      "path": "internal/gui/assets/icons/prime-agent.svg",
+      "snapshot": "upstream/icons/prime-agent.svg",
+      "sha256": "9eed2ee52a4330df5f9740264e2705c0b2d83b55a265ff45fc491a8d015eb90b",
+      "bytes": 4101
+    },
+    {
+      "path": "internal/gui/assets/icons/qiniu-color.svg",
+      "snapshot": "upstream/icons/qiniu-color.svg",
+      "sha256": "a3b7b47f1127448d32efee0abc38b495ed183518fb9847905fcad7b05839ba53",
+      "bytes": 649
+    },
+    {
+      "path": "internal/gui/assets/icons/qoder.svg",
+      "snapshot": "upstream/icons/qoder.svg",
+      "sha256": "f8503aacc41a58e723430488d082f6730c8a6a9ffecdd0a00c522e6bcdb4abb9",
+      "bytes": 6214
+    },
+    {
+      "path": "internal/gui/assets/icons/qwen-color.svg",
+      "snapshot": "upstream/icons/qwen-color.svg",
+      "sha256": "77f5768c66d08ce1d3d14e73373975c1bc0454be88c81523ddd0ffd7e2974029",
+      "bytes": 2044
+    },
+    {
+      "path": "internal/gui/assets/icons/qwenpaw.svg",
+      "snapshot": "upstream/icons/qwenpaw.svg",
+      "sha256": "6f8dbdbc257d6c87bcfbd0a7d3cda0624df1feda8157402be0802bb80e8adcb4",
+      "bytes": 6998
+    },
+    {
+      "path": "internal/gui/assets/icons/raycast.svg",
+      "snapshot": "upstream/icons/raycast.svg",
+      "sha256": "3a3352f28af4df22aa0c76383dfbde6b8d309f5977a802a049da45092ddb459f",
+      "bytes": 617
+    },
+    {
+      "path": "internal/gui/assets/icons/reasonix-color.svg",
+      "snapshot": "upstream/icons/reasonix-color.svg",
+      "sha256": "1479f9f6a0d28ded10db176a9f5612061a44000ce307867a7c09ce21be370e2d",
+      "bytes": 3705
+    },
+    {
+      "path": "internal/gui/assets/icons/reka.svg",
+      "snapshot": "upstream/icons/reka.svg",
+      "sha256": "533ae212f32db47ffc179c272fb6c7fb0cc71e516a68ad3b58c435b0e8f20063",
+      "bytes": 2866
+    },
+    {
+      "path": "internal/gui/assets/icons/replicate.svg",
+      "snapshot": "upstream/icons/replicate.svg",
+      "sha256": "ff02158db5bc4a693d7f690c36cd7d547b8ca3313accba0783b2d3af28dae1e6",
+      "bytes": 313
+    },
+    {
+      "path": "internal/gui/assets/icons/roocode.svg",
+      "snapshot": "upstream/icons/roocode.svg",
+      "sha256": "34904d40bfd976b5c1c7495d2fdfdca1c137cb416bff2000184e0ee27bfb5161",
+      "bytes": 763
+    },
+    {
+      "path": "internal/gui/assets/icons/rtk.png",
+      "snapshot": "upstream/icons/rtk.png",
+      "sha256": "83fad62353224d18ca426d6e00c679132d0faca88c66c13cfe92cf5d0437e22d",
+      "bytes": 4396
+    },
+    {
+      "path": "internal/gui/assets/icons/sambanova-color.svg",
+      "snapshot": "upstream/icons/sambanova-color.svg",
+      "sha256": "411ab881318738b7689e5fc6c4e0879a22913aabb9bc2125e3fc03f24e3214d5",
+      "bytes": 1602
+    },
+    {
+      "path": "internal/gui/assets/icons/sensenova-color.svg",
+      "snapshot": "upstream/icons/sensenova-color.svg",
+      "sha256": "bd2e0f8e310ff6a5edcc56a85560221923262767ba76b660a193f45c40c123fa",
+      "bytes": 1559
+    },
+    {
+      "path": "internal/gui/assets/icons/siliconcloud-color.svg",
+      "snapshot": "upstream/icons/siliconcloud-color.svg",
+      "sha256": "a02d8d7ccb81739fbc720e2e5daaf149013dd5088605dc2dce1b71df0784d424",
+      "bytes": 520
+    },
+    {
+      "path": "internal/gui/assets/icons/snow.png",
+      "snapshot": "upstream/icons/snow.png",
+      "sha256": "f62d61e2fd399f45f2f12fd82cdc879a08418c18c5177d79440d02e13a3652eb",
+      "bytes": 6375
+    },
+    {
+      "path": "internal/gui/assets/icons/snowflake-color.svg",
+      "snapshot": "upstream/icons/snowflake-color.svg",
+      "sha256": "f9e4d625d1563a0228fc738e3903c72a200da1aa75d156dac46c31067be0b314",
+      "bytes": 2292
+    },
+    {
+      "path": "internal/gui/assets/icons/sophnet-color.svg",
+      "snapshot": "upstream/icons/sophnet-color.svg",
+      "sha256": "ef90bf51bc6c55ca1208973e4e6bdc4690e949c4ee6d71d4c494eeb2372e56d2",
+      "bytes": 654
+    },
+    {
+      "path": "internal/gui/assets/icons/spark-color.svg",
+      "snapshot": "upstream/icons/spark-color.svg",
+      "sha256": "4068581452b808e4d9f8c5b43b42d324512d6801de26e57cf848125c28db85bc",
+      "bytes": 882
+    },
+    {
+      "path": "internal/gui/assets/icons/stepfun-color.svg",
+      "snapshot": "upstream/icons/stepfun-color.svg",
+      "sha256": "f55afc0e6004c8854f76bd5bbcc0fce9fc0ed9316691d54fb02d088c24fab40d",
+      "bytes": 676
+    },
+    {
+      "path": "internal/gui/assets/icons/straico-color.svg",
+      "snapshot": "upstream/icons/straico-color.svg",
+      "sha256": "590fc23e586e03b8026c993e1694045044d7c84b3b09261c872c4bd1178c8a2b",
+      "bytes": 224
+    },
+    {
+      "path": "internal/gui/assets/icons/submodel-color.svg",
+      "snapshot": "upstream/icons/submodel-color.svg",
+      "sha256": "de65dab573c676c9ece150bff30f5c8fe01856f6ee5e7f8264d26ee5b3ba9811",
+      "bytes": 2615
+    },
+    {
+      "path": "internal/gui/assets/icons/t3code.svg",
+      "snapshot": "upstream/icons/t3code.svg",
+      "sha256": "e8e6bdbdf374afea551bba40cb78e9a0866426144bd6286fd1e08b767cbdb264",
+      "bytes": 1013
+    },
+    {
+      "path": "internal/gui/assets/icons/targon-color.svg",
+      "snapshot": "upstream/icons/targon-color.svg",
+      "sha256": "bf5408cb3d59fc0046db6eb41bdc1cf18058e742a664731d6722bdd3f343d3a7",
+      "bytes": 1323
+    },
+    {
+      "path": "internal/gui/assets/icons/tencent-color.svg",
+      "snapshot": "upstream/icons/tencent-color.svg",
+      "sha256": "7c370ad4b75e3f30d0fa7da71f90466a0ee95a887189479aa9df414079b50eb6",
+      "bytes": 277
+    },
+    {
+      "path": "internal/gui/assets/icons/tencentcloud-color.svg",
+      "snapshot": "upstream/icons/tencentcloud-color.svg",
+      "sha256": "f860dae064a3afd24970efd2bc5892f39438526bf52c3a9748f61fc05c1cfd58",
+      "bytes": 2124
+    },
+    {
+      "path": "internal/gui/assets/icons/tiangong-color.svg",
+      "snapshot": "upstream/icons/tiangong-color.svg",
+      "sha256": "3b0ba724337004a51acbdb5bebd6bf5af58a538edf0c826d90067ac85f71641b",
+      "bytes": 2604
+    },
+    {
+      "path": "internal/gui/assets/icons/together-color.svg",
+      "snapshot": "upstream/icons/together-color.svg",
+      "sha256": "27ccaf118a431c386b88418a34a4346afd9638dde10e3f2295db2eec1fa5898a",
+      "bytes": 582
+    },
+    {
+      "path": "internal/gui/assets/icons/trae.svg",
+      "snapshot": "upstream/icons/trae.svg",
+      "sha256": "59ef6255dfce52d4b1e77aff4e1b4ee3cda71cda735b4fb45575e9874a1c11f6",
+      "bytes": 402
+    },
+    {
+      "path": "internal/gui/assets/icons/typesafe.png",
+      "snapshot": "upstream/icons/typesafe.png",
+      "sha256": "86f8c025fc0e0b44de7e3c049d0719e50c81675a104e6ca8e562e89f38a858b8",
+      "bytes": 8085
+    },
+    {
+      "path": "internal/gui/assets/icons/upstage-color.svg",
+      "snapshot": "upstream/icons/upstage-color.svg",
+      "sha256": "206e23f9143cd308998cddae36b674651d7435eebc357c596dacb2b39228a485",
+      "bytes": 946
+    },
+    {
+      "path": "internal/gui/assets/icons/venice-color.svg",
+      "snapshot": "upstream/icons/venice-color.svg",
+      "sha256": "a4a909b289b05d3b4cc716452d0c744619b23e110d2853bafd81bfba7c8c165f",
+      "bytes": 2683
+    },
+    {
+      "path": "internal/gui/assets/icons/vercel.svg",
+      "snapshot": "upstream/icons/vercel.svg",
+      "sha256": "4874d52d8b2ce7c309cbd10c424fee123b2c9483e76d76ad0dca41794483eb24",
+      "bytes": 225
+    },
+    {
+      "path": "internal/gui/assets/icons/vertexai-color.svg",
+      "snapshot": "upstream/icons/vertexai-color.svg",
+      "sha256": "40f8bb6f7aca8d80ce2b0bd0d976e8e3ddeada3719758d262ea20075c11ad764",
+      "bytes": 2171
+    },
+    {
+      "path": "internal/gui/assets/icons/vllm-color.svg",
+      "snapshot": "upstream/icons/vllm-color.svg",
+      "sha256": "3f837bad8d7f85d19e860a089639289ddd7492e67dc1ac7bd0f129f8f19b8ae6",
+      "bytes": 286
+    },
+    {
+      "path": "internal/gui/assets/icons/volcengine-color.svg",
+      "snapshot": "upstream/icons/volcengine-color.svg",
+      "sha256": "84f9e2cd1da7e73dc6c9a0f2521745d39cae96c008752cdb1baf57a8c94393a1",
+      "bytes": 858
+    },
+    {
+      "path": "internal/gui/assets/icons/voyage-color.svg",
+      "snapshot": "upstream/icons/voyage-color.svg",
+      "sha256": "96423656ee32fb76eba43b9030612c997889b056912ddbc9b249f960adb2e333",
+      "bytes": 610
+    },
+    {
+      "path": "internal/gui/assets/icons/vscode.svg",
+      "snapshot": "upstream/icons/vscode.svg",
+      "sha256": "01d978e9a8365ae75c91cd9cfb48552d6a4b9ffd3c9c9aa9fdec9db90285c6bd",
+      "bytes": 935
+    },
+    {
+      "path": "internal/gui/assets/icons/wenxin-color.svg",
+      "snapshot": "upstream/icons/wenxin-color.svg",
+      "sha256": "9fb88d8b6f7be470ddb07f0574ec276b08a35ba96d73ec5f2f3b6fc338da5cb6",
+      "bytes": 1509
+    },
+    {
+      "path": "internal/gui/assets/icons/windsurf.svg",
+      "snapshot": "upstream/icons/windsurf.svg",
+      "sha256": "e3c836aae05a3741e33d5c5a38d4167aacfbb69e480d098b8b94cad8c90e0d08",
+      "bytes": 820
+    },
+    {
+      "path": "internal/gui/assets/icons/workbuddy-color.svg",
+      "snapshot": "upstream/icons/workbuddy-color.svg",
+      "sha256": "ade134028e69e03453bff956059a0e7f23c7341a0295f16994cecd8d03fc2fd4",
+      "bytes": 4119
+    },
+    {
+      "path": "internal/gui/assets/icons/workersai-color.svg",
+      "snapshot": "upstream/icons/workersai-color.svg",
+      "sha256": "22617d11289857c70fe9d626e1622e0eb77f53a875177d866ffc3f95def6ab7e",
+      "bytes": 778
+    },
+    {
+      "path": "internal/gui/assets/icons/xai.svg",
+      "snapshot": "upstream/icons/xai.svg",
+      "sha256": "89eb7de9f0d02a41cfecd9109e253d7fd3529e27467dee4254faa67f3ac21451",
+      "bytes": 372
+    },
+    {
+      "path": "internal/gui/assets/icons/xiaomimimo.svg",
+      "snapshot": "upstream/icons/xiaomimimo.svg",
+      "sha256": "b04ad7dad52af2212c4567daf0ee6856f2c4625c92c680a27f9880295d558b71",
+      "bytes": 2544
+    },
+    {
+      "path": "internal/gui/assets/icons/xinference-color.svg",
+      "snapshot": "upstream/icons/xinference-color.svg",
+      "sha256": "9fb12f4b6b3451a6295ce66d3596c8b36249077ad24d7b817b70ef0171529007",
+      "bytes": 2594
+    },
+    {
+      "path": "internal/gui/assets/icons/yi.svg",
+      "snapshot": "upstream/icons/yi.svg",
+      "sha256": "c1975458cc94ee44306336215fdf64b1a25f60d7b3f4c01aee5a720eddea0e0a",
+      "bytes": 771
+    },
+    {
+      "path": "internal/gui/assets/icons/yuanbao-color.svg",
+      "snapshot": "upstream/icons/yuanbao-color.svg",
+      "sha256": "522b9c3ee6f4136b3dd2f5e844a2273b6d599ae614329dbcaf96c74375b0fdd5",
+      "bytes": 1110
+    },
+    {
+      "path": "internal/gui/assets/icons/yylx.svg",
+      "snapshot": "upstream/icons/yylx.svg",
+      "sha256": "d9027766b7df75908eb87a4ce969e223821d75b64ba4722eeb8d94bb62369d00",
+      "bytes": 27466
+    },
+    {
+      "path": "internal/gui/assets/icons/zai.svg",
+      "snapshot": "upstream/icons/zai.svg",
+      "sha256": "e748cb5108ce37b116d7a5ba97d37e0ae97eadf6849b0de11afb248e244a01e1",
+      "bytes": 319
+    },
+    {
+      "path": "internal/gui/assets/icons/zcode.png",
+      "snapshot": "upstream/icons/zcode.png",
+      "sha256": "df3aba17ddb55b9cfb21f1f30d11fde7ea93d3193c40b3d6433cf684af942b99",
+      "bytes": 8170
+    },
+    {
+      "path": "internal/gui/assets/icons/zed.svg",
+      "snapshot": "upstream/icons/zed.svg",
+      "sha256": "f0529485410560c5be58f724330c4f61d84537c4ffc1a5099b3bd58062efd58c",
+      "bytes": 760
+    },
+    {
+      "path": "internal/gui/assets/icons/zenmux.svg",
+      "snapshot": "upstream/icons/zenmux.svg",
+      "sha256": "1f9fab4e48601ca583e44ff06f22040a8b40f8952bc6bd67e67b065bef00b4b5",
+      "bytes": 2500
+    },
+    {
+      "path": "internal/gui/assets/icons/zeroone.svg",
+      "snapshot": "upstream/icons/zeroone.svg",
+      "sha256": "548126aabc59e4fcfbb773d40758ace786a8089397bcd1a135cfa6bed03b7d74",
+      "bytes": 868
+    },
+    {
+      "path": "internal/gui/assets/icons/zhipu-color.svg",
+      "snapshot": "upstream/icons/zhipu-color.svg",
+      "sha256": "8174e65ff71647d5c705c920c953a82bd723d9e3e42887bdd4ffc9dfe51207a0",
+      "bytes": 3597
+    },
+    {
+      "path": "internal/gui/assets/icons/zoo-code.png",
+      "snapshot": "upstream/icons/zoo-code.png",
+      "sha256": "22e6e76317e1d026ce92f7f678494b4dda1689132634d143be800173db4f7c98",
+      "bytes": 18982
+    },
+    {
+      "path": "internal/agent/agents.go",
+      "snapshot": "upstream/internal/agent/agents.go",
+      "sha256": "ee0c94a04f988749491f20e75a36b6cad8c2da4aada22b9ea181c496dce8de01",
+      "bytes": 75351
+    },
+    {
+      "path": "internal/agent/agy.go",
+      "snapshot": "upstream/internal/agent/agy.go",
+      "sha256": "b6041c523c82dc8da5d178ef5ac7e820f84663119b2172cc876a5cfee52ee099",
+      "bytes": 15609
+    },
+    {
+      "path": "internal/agent/aionui.go",
+      "snapshot": "upstream/internal/agent/aionui.go",
+      "sha256": "5d4ed6fedab663d0586271a591776f2e849fa9a4bdea5fdd3972e7cb41d12dba",
+      "bytes": 3865
+    },
+    {
+      "path": "internal/agent/air.go",
+      "snapshot": "upstream/internal/agent/air.go",
+      "sha256": "cf22c5bfd4b15850bc5eacf98e810a5abbd050de4f7c33a3477c7d8ebe34b573",
+      "bytes": 12520
+    },
+    {
+      "path": "internal/agent/alma.go",
+      "snapshot": "upstream/internal/agent/alma.go",
+      "sha256": "9292f03c72e5f9d48d1353b9c7d0897d5a0218b8da4372e1d5453456d5b0b85d",
+      "bytes": 24272
+    },
+    {
+      "path": "internal/agent/ante.go",
+      "snapshot": "upstream/internal/agent/ante.go",
+      "sha256": "e84171e7f88f49371f321b54f8926101a1b76e7d2cad6c121508fba81456185e",
+      "bytes": 17201
+    },
+    {
+      "path": "internal/agent/antigravity.go",
+      "snapshot": "upstream/internal/agent/antigravity.go",
+      "sha256": "b1bdc447c99bacfb38c19605bf848d8ced2a9257f503c74d951f87fdb85ddcbb",
+      "bytes": 8872
+    },
+    {
+      "path": "internal/agent/aside.go",
+      "snapshot": "upstream/internal/agent/aside.go",
+      "sha256": "5b35e7dfbf635459ee6c0efce6a512982f7590bcbabb6c9f0a31c2b040762a6d",
+      "bytes": 3050
+    },
+    {
+      "path": "internal/agent/astrbot.go",
+      "snapshot": "upstream/internal/agent/astrbot.go",
+      "sha256": "01d8cd5818973ff3019ce1ca528ab49c3e8bd3d28c481f54227f1e2369cac5a9",
+      "bytes": 17127
+    },
+    {
+      "path": "internal/agent/atomcode.go",
+      "snapshot": "upstream/internal/agent/atomcode.go",
+      "sha256": "438d893f676c93a73d2e0552eb93b834fedd0a950f79a8aa9b08d9f1505a23af",
+      "bytes": 15060
+    },
+    {
+      "path": "internal/agent/cindy.go",
+      "snapshot": "upstream/internal/agent/cindy.go",
+      "sha256": "56669204d649fe39594772c1744887b7c59764b687534b67946ebc0004a9b8b2",
+      "bytes": 4392
+    },
+    {
+      "path": "internal/agent/claude.go",
+      "snapshot": "upstream/internal/agent/claude.go",
+      "sha256": "bdee9eb6d93eab3a001e7782f1901b50d83d77a57c0eea9413f01c341e84b6eb",
+      "bytes": 115340
+    },
+    {
+      "path": "internal/agent/claudedesktop.go",
+      "snapshot": "upstream/internal/agent/claudedesktop.go",
+      "sha256": "304675de0ed176a774fdc3b7f25ac3465dbe19dba64661c95084d24aca43da3d",
+      "bytes": 40869
+    },
+    {
+      "path": "internal/agent/cline.go",
+      "snapshot": "upstream/internal/agent/cline.go",
+      "sha256": "3edd4ac9d7d333f922fc68e08222051ef3dd09f39e6a723b7d750a999f466a49",
+      "bytes": 16088
+    },
+    {
+      "path": "internal/agent/codebuddy.go",
+      "snapshot": "upstream/internal/agent/codebuddy.go",
+      "sha256": "bd0ca087f0c469dbabc62141e77d80e7bd902c066607ac1b7c1dda20725d49ed",
+      "bytes": 4484
+    },
+    {
+      "path": "internal/agent/codex.go",
+      "snapshot": "upstream/internal/agent/codex.go",
+      "sha256": "ffdc7c7723f4197f1430fccc7b7cfc360efc9352a1dea5a922334858c7fa4801",
+      "bytes": 127249
+    },
+    {
+      "path": "internal/agent/commandcode.go",
+      "snapshot": "upstream/internal/agent/commandcode.go",
+      "sha256": "c2522932ee70cefe6809eb5dd4e961098bcc5c66585072597322483e20ea9bbd",
+      "bytes": 6784
+    },
+    {
+      "path": "internal/agent/devin.go",
+      "snapshot": "upstream/internal/agent/devin.go",
+      "sha256": "1c993700b77e9b98f162d50c57ffd1a68018eff665923d4903d8483e89ff38c0",
+      "bytes": 5151
+    },
+    {
+      "path": "internal/agent/droid.go",
+      "snapshot": "upstream/internal/agent/droid.go",
+      "sha256": "da7e8ca528fee092b88a48b47c82f6a318ceeb690a3bc42d660fe77d68763b1f",
+      "bytes": 19992
+    },
+    {
+      "path": "internal/agent/dsh.go",
+      "snapshot": "upstream/internal/agent/dsh.go",
+      "sha256": "a955ab4fb288ef3e6cdb3646ead6340f4e6fcb7f8b3ccc3967a7139a79bdf810",
+      "bytes": 100405
+    },
+    {
+      "path": "internal/agent/empryo.go",
+      "snapshot": "upstream/internal/agent/empryo.go",
+      "sha256": "b74a712475ab9e39cae809daab6f3f1a857da65d36cce67a7979cc0a90868cb1",
+      "bytes": 5449
+    },
+    {
+      "path": "internal/agent/fx.go",
+      "snapshot": "upstream/internal/agent/fx.go",
+      "sha256": "d61d2f0b50d55de40f863c0ac47aae837ef7b9b84a71c848d3930c6668b08981",
+      "bytes": 6663
+    },
+    {
+      "path": "internal/agent/gemini.go",
+      "snapshot": "upstream/internal/agent/gemini.go",
+      "sha256": "a1019e000ac49d09111b7ab1058ec2e82645f22b1b5d947d2329b422bd321546",
+      "bytes": 9867
+    },
+    {
+      "path": "internal/agent/grok.go",
+      "snapshot": "upstream/internal/agent/grok.go",
+      "sha256": "0b09af0c810f69150c92a7622ee465152176450d6161e078095af156fe6f7ec9",
+      "bytes": 14086
+    },
+    {
+      "path": "internal/agent/grokapp.go",
+      "snapshot": "upstream/internal/agent/grokapp.go",
+      "sha256": "6d20fc781aace7414ab60c8fc29616c11a7a3b2237aaae2acf45207ed9bc647d",
+      "bytes": 15464
+    },
+    {
+      "path": "internal/agent/hanako.go",
+      "snapshot": "upstream/internal/agent/hanako.go",
+      "sha256": "c7f56d2659fa7cfd0a66ee48f50af03354b3a7c1697fbe251b0aac32eda49452",
+      "bytes": 20419
+    },
+    {
+      "path": "internal/agent/hermes.go",
+      "snapshot": "upstream/internal/agent/hermes.go",
+      "sha256": "0833ce2e9a5b0b0ddf87e07ad5bd1c4ea54a95099b38c7166df326030fe3f5d8",
+      "bytes": 35261
+    },
+    {
+      "path": "internal/agent/jcode.go",
+      "snapshot": "upstream/internal/agent/jcode.go",
+      "sha256": "a597b7f7058b23a162bc8c8046385318152c6932572b3a780ea1d7f5ca79c97c",
+      "bytes": 11729
+    },
+    {
+      "path": "internal/agent/kimi.go",
+      "snapshot": "upstream/internal/agent/kimi.go",
+      "sha256": "486f4ba95781e1ec3be2ff0630600c2b133b1d81cf8f667224d04b458b63a032",
+      "bytes": 15995
+    },
+    {
+      "path": "internal/agent/kirocrew.go",
+      "snapshot": "upstream/internal/agent/kirocrew.go",
+      "sha256": "9cea1ebce05180e48ac0ba6aca38d1335246eaca263f981a00506d41da684c6c",
+      "bytes": 20060
+    },
+    {
+      "path": "internal/agent/liveagent.go",
+      "snapshot": "upstream/internal/agent/liveagent.go",
+      "sha256": "fb6d9c160a149d2b9ff6789f85793afe215e63a314b48e48189764d1feef28a5",
+      "bytes": 25235
+    },
+    {
+      "path": "internal/agent/lody.go",
+      "snapshot": "upstream/internal/agent/lody.go",
+      "sha256": "0b37068b8d5dda5101b559762e0bd8d40093f25d2a47f7b682f1564ea564c87d",
+      "bytes": 11275
+    },
+    {
+      "path": "internal/agent/minimax.go",
+      "snapshot": "upstream/internal/agent/minimax.go",
+      "sha256": "9b6a37098719b328c1b900c5a2b3d58f66ae6aacacf23b2b076629ab56f65f56",
+      "bytes": 16775
+    },
+    {
+      "path": "internal/agent/morph.go",
+      "snapshot": "upstream/internal/agent/morph.go",
+      "sha256": "26251847c72f196d7ad3294c1c266fcef53106a7251d7f38e0fcaa7761fde50b",
+      "bytes": 6108
+    },
+    {
+      "path": "internal/agent/mothx.go",
+      "snapshot": "upstream/internal/agent/mothx.go",
+      "sha256": "38af0ea55e70fcde6594e16f079bb86578ae4664f7b4f7ce606089caa943fd25",
+      "bytes": 10325
+    },
+    {
+      "path": "internal/agent/muse.go",
+      "snapshot": "upstream/internal/agent/muse.go",
+      "sha256": "d5d687395c561b71c5dea38545f073eff1e57a35e5560e9f800c21e547989ec8",
+      "bytes": 5936
+    },
+    {
+      "path": "internal/agent/newmax.go",
+      "snapshot": "upstream/internal/agent/newmax.go",
+      "sha256": "6626b89f3441271458e86e3e770b652288eb94e1e205428df4f98ee2e625d866",
+      "bytes": 16341
+    },
+    {
+      "path": "internal/agent/omo.go",
+      "snapshot": "upstream/internal/agent/omo.go",
+      "sha256": "382aad05212f04a168dfde907ab7cfaf207c38fb23b8b693e28931ec8a6f3dc9",
+      "bytes": 1296
+    },
+    {
+      "path": "internal/agent/omp.go",
+      "snapshot": "upstream/internal/agent/omp.go",
+      "sha256": "115710537bd268d16c593fb88bb01b291cd2911f087968477a80c2f2cfdfa8b7",
+      "bytes": 34275
+    },
+    {
+      "path": "internal/agent/openbot.go",
+      "snapshot": "upstream/internal/agent/openbot.go",
+      "sha256": "c5d92c06c20a2003b283231aa1b665969d96e8332d41fd0b8e2246c5cec1f7be",
+      "bytes": 10773
+    },
+    {
+      "path": "internal/agent/openchamber.go",
+      "snapshot": "upstream/internal/agent/openchamber.go",
+      "sha256": "45c035dd889d2a7bf2bd4b43c676614626dc3966d04b5b621117cbc0dbcfdd64",
+      "bytes": 8501
+    },
+    {
+      "path": "internal/agent/openclaw.go",
+      "snapshot": "upstream/internal/agent/openclaw.go",
+      "sha256": "dab8a801562ac1468c474734aa02e7c4339a79c8fac61f537c32f916253fe518",
+      "bytes": 17018
+    },
+    {
+      "path": "internal/agent/openpencil.go",
+      "snapshot": "upstream/internal/agent/openpencil.go",
+      "sha256": "60bdafba5262e202bdf5e7f3e248b04bbbdc6974b60b1e45a6c83c814efe0583",
+      "bytes": 11605
+    },
+    {
+      "path": "internal/agent/pencil.go",
+      "snapshot": "upstream/internal/agent/pencil.go",
+      "sha256": "e8dabeff72a85fbe59db11b193247729b6f3b73314db5430b5074a207e79ee35",
+      "bytes": 4705
+    },
+    {
+      "path": "internal/agent/penguin.go",
+      "snapshot": "upstream/internal/agent/penguin.go",
+      "sha256": "eb8e2cf08a10306b05d42d9cc56740216f4a997134ea7f348f87b464b41789d0",
+      "bytes": 12307
+    },
+    {
+      "path": "internal/agent/qwen.go",
+      "snapshot": "upstream/internal/agent/qwen.go",
+      "sha256": "c3eb21b7bab677ab4d0fad6599d26a82fbb2fc96afb069761ee3a2f43b9b9de2",
+      "bytes": 14042
+    },
+    {
+      "path": "internal/agent/qwenpaw.go",
+      "snapshot": "upstream/internal/agent/qwenpaw.go",
+      "sha256": "6d69d1089e90ac830b3fc1e0a900141276e0da2eb4845294bb5dfe1882acec12",
+      "bytes": 24596
+    },
+    {
+      "path": "internal/agent/raycast.go",
+      "snapshot": "upstream/internal/agent/raycast.go",
+      "sha256": "f7e312c9b4c142441323f9653f3ff235b511541d18254460b8970116f1cfacd5",
+      "bytes": 10354
+    },
+    {
+      "path": "internal/agent/reasonix.go",
+      "snapshot": "upstream/internal/agent/reasonix.go",
+      "sha256": "a0e110d189c7a2022afa74c491e6e5173829c76a542b19c0c753310eb934b828",
+      "bytes": 21743
+    },
+    {
+      "path": "internal/agent/snow.go",
+      "snapshot": "upstream/internal/agent/snow.go",
+      "sha256": "cefc2e8a39689f1c2559c100a37ea2615f646623cddd2bd87f9ebeee81d239be",
+      "bytes": 21584
+    },
+    {
+      "path": "internal/agent/stepcode.go",
+      "snapshot": "upstream/internal/agent/stepcode.go",
+      "sha256": "f0e008564273d509e877f46dad909c5cf01fec15bd19e40640607529605873b0",
+      "bytes": 17192
+    },
+    {
+      "path": "internal/agent/t3code.go",
+      "snapshot": "upstream/internal/agent/t3code.go",
+      "sha256": "76d0bad142e9ab751736f04e954477acd00014141e098d124b8e4e6921d2d163",
+      "bytes": 21128
+    },
+    {
+      "path": "internal/agent/zcode.go",
+      "snapshot": "upstream/internal/agent/zcode.go",
+      "sha256": "d61dded9094beb7474e4c38a3d25bfad364b0984bb33e0bf73ce162aa020f49a",
+      "bytes": 23364
+    },
+    {
+      "path": "internal/agent/zed.go",
+      "snapshot": "upstream/internal/agent/zed.go",
+      "sha256": "39766055bc798821bfc791fd07becf43f9ee1164b661ce0e1df3eabc2133562e",
+      "bytes": 8352
+    },
+    {
+      "path": "internal/agent/zoocode.go",
+      "snapshot": "upstream/internal/agent/zoocode.go",
+      "sha256": "b5f15eeffb095ac324b47ab66d2ceee0fba749e746ca1231d81998ef3b136a1b",
+      "bytes": 9413
+    }
+  ],
+  "clients": [
+    {
+      "id": "agy",
+      "name": "Antigravity CLI",
+      "icon": "antigravity-color"
+    },
+    {
+      "id": "aionui",
+      "name": "AionUi",
+      "icon": "aionui"
+    },
+    {
+      "id": "air",
+      "name": "JetBrains Air",
+      "icon": "air"
+    },
+    {
+      "id": "air-ide",
+      "name": "Air (JetBrains IDEs)",
+      "icon": "air"
+    },
+    {
+      "id": "alma",
+      "name": "Alma",
+      "icon": "alma"
+    },
+    {
+      "id": "ante",
+      "name": "Ante",
+      "icon": "generic"
+    },
+    {
+      "id": "antigravity",
+      "name": "Antigravity",
+      "icon": "antigravity-color"
+    },
+    {
+      "id": "aside",
+      "name": "Aside",
+      "icon": "aside"
+    },
+    {
+      "id": "astrbot",
+      "name": "AstrBot",
+      "icon": "astrbot"
+    },
+    {
+      "id": "atomcode",
+      "name": "AtomCode",
+      "icon": "atomcode"
+    },
+    {
+      "id": "cindy",
+      "name": "Cindy",
+      "icon": "cindy"
+    },
+    {
+      "id": "claude",
+      "name": "Claude Code",
+      "icon": "claudecode-color"
+    },
+    {
+      "id": "claude-desktop",
+      "name": "Claude Desktop",
+      "icon": "claude-color"
+    },
+    {
+      "id": "cline",
+      "name": "Cline",
+      "icon": "cline"
+    },
+    {
+      "id": "codebuddy",
+      "name": "CodeBuddy",
+      "icon": "codebuddy-color"
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "icon": "codex-color"
+    },
+    {
+      "id": "commandcode",
+      "name": "Command Code",
+      "icon": "commandcode"
+    },
+    {
+      "id": "copilot",
+      "name": "Copilot CLI",
+      "icon": "githubcopilot"
+    },
+    {
+      "id": "crush",
+      "name": "Crush",
+      "icon": "crush"
+    },
+    {
+      "id": "curl",
+      "name": "curl",
+      "icon": "curl"
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor CLI",
+      "icon": "cursor"
+    },
+    {
+      "id": "deveco",
+      "name": "DevEco Code",
+      "icon": "deveco-color"
+    },
+    {
+      "id": "devin",
+      "name": "Devin",
+      "icon": "devin"
+    },
+    {
+      "id": "droid",
+      "name": "Droid",
+      "icon": "factory"
+    },
+    {
+      "id": "dsh",
+      "name": "DeepSeek Harness",
+      "icon": "deepseek-color"
+    },
+    {
+      "id": "empryo",
+      "name": "Empryo",
+      "icon": "empryo-color"
+    },
+    {
+      "id": "fx",
+      "name": "fx",
+      "icon": "fx"
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini CLI",
+      "icon": "geminicli-color"
+    },
+    {
+      "id": "goose",
+      "name": "Goose",
+      "icon": "goose"
+    },
+    {
+      "id": "grok",
+      "name": "Grok Build",
+      "icon": "xai"
+    },
+    {
+      "id": "grok-app",
+      "name": "Grok App",
+      "icon": "grok"
+    },
+    {
+      "id": "hanako",
+      "name": "OpenHanako",
+      "icon": "hanako"
+    },
+    {
+      "id": "hermes",
+      "name": "Hermes Agent",
+      "icon": "hermes"
+    },
+    {
+      "id": "jcode",
+      "name": "jcode",
+      "icon": "jcode"
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi Code",
+      "icon": "kimi"
+    },
+    {
+      "id": "kimi-code-desktop",
+      "name": "Kimi Code Desktop",
+      "icon": "kimi-code-desktop"
+    },
+    {
+      "id": "kirocrew",
+      "name": "Kiro Crew",
+      "icon": "generic"
+    },
+    {
+      "id": "liveagent",
+      "name": "LiveAgent",
+      "icon": "liveagent-color"
+    },
+    {
+      "id": "lody",
+      "name": "Lody",
+      "icon": "lody"
+    },
+    {
+      "id": "magpie",
+      "name": "magpie",
+      "icon": "magpie"
+    },
+    {
+      "id": "mimocode",
+      "name": "MiMo Code",
+      "icon": "mimocode"
+    },
+    {
+      "id": "minimax-code",
+      "name": "MiniMax Code",
+      "icon": "minimax-color"
+    },
+    {
+      "id": "morph",
+      "name": "Mister Morph",
+      "icon": "mistermorph-color"
+    },
+    {
+      "id": "mothx",
+      "name": "MothX",
+      "icon": "mothx"
+    },
+    {
+      "id": "muse",
+      "name": "Muse Code",
+      "icon": "meta-color"
+    },
+    {
+      "id": "newmax",
+      "name": "NewMax",
+      "icon": "generic"
+    },
+    {
+      "id": "omo",
+      "name": "OmO",
+      "icon": "omo"
+    },
+    {
+      "id": "omp",
+      "name": "omp",
+      "icon": "omp"
+    },
+    {
+      "id": "openbot",
+      "name": "OpenBot",
+      "icon": "generic"
+    },
+    {
+      "id": "openchamber",
+      "name": "OpenChamber",
+      "icon": "openchamber"
+    },
+    {
+      "id": "openclaw",
+      "name": "OpenClaw",
+      "icon": "openclaw"
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "icon": "opencode"
+    },
+    {
+      "id": "openpencil",
+      "name": "OpenPencil",
+      "icon": "generic"
+    },
+    {
+      "id": "pencil",
+      "name": "Pencil",
+      "icon": "generic"
+    },
+    {
+      "id": "penguin",
+      "name": "PenguinHarness",
+      "icon": "penguin-color"
+    },
+    {
+      "id": "pi",
+      "name": "Pi",
+      "icon": "pi"
+    },
+    {
+      "id": "pi-desktop",
+      "name": "PI-Desktop",
+      "icon": "pi"
+    },
+    {
+      "id": "qwen",
+      "name": "Qwen Code",
+      "icon": "qwen-color"
+    },
+    {
+      "id": "qwenpaw",
+      "name": "QwenPaw",
+      "icon": "qwenpaw"
+    },
+    {
+      "id": "raft",
+      "name": "Raft",
+      "icon": "generic"
+    },
+    {
+      "id": "raycast",
+      "name": "Raycast",
+      "icon": "raycast"
+    },
+    {
+      "id": "reasonix",
+      "name": "Reasonix Studio",
+      "icon": "reasonix-color"
+    },
+    {
+      "id": "snow",
+      "name": "Snow CLI",
+      "icon": "snow"
+    },
+    {
+      "id": "stepcode",
+      "name": "StepCode",
+      "icon": "stepfun-color"
+    },
+    {
+      "id": "t3code",
+      "name": "T3 Code",
+      "icon": "t3code"
+    },
+    {
+      "id": "zcode",
+      "name": "ZCode",
+      "icon": "zcode"
+    },
+    {
+      "id": "zed",
+      "name": "Zed",
+      "icon": "zed"
+    },
+    {
+      "id": "zoo-code",
+      "name": "Zoo Code",
+      "icon": "zoo-code"
+    }
+  ]
+}

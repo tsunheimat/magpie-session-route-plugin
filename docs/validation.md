@@ -2,6 +2,56 @@
 
 This record distinguishes **implemented**, **automatically tested**, and **deployment-verified** behavior. A loopback/protocol fixture is not a Docker, external HTTPS or production agent-process test. Generated artifacts are excluded from the npm package.
 
+## v0.3.0 native upper-block copy — 2026-11-09
+
+The requested behavior is the actual native upper Routing block with client-source grouping by exact agent + recorded session. Version 0.2.0's custom renderer, session selector and per-request source nodes did not meet that requirement even though its automated tests passed. Version **0.3.0**, developed on `feat/native-session-clients`, uses the actual pinned source/CSS/artwork, deterministic extraction and a separate **25-replacement source-grouping patch**. The user explicitly requested merge and release after the comparison screenshots and known differences were presented; this does not erase the measured differences or establish pixel-identical parity.
+
+Runtime fingerprint: **`d1f39f46e7188ea6de7d59fbc839b2eec3d4a888c0ad5b5051c583a0955ac3f8`**, over 222 lexically sorted paths: `index.mjs`, `package.json`, files directly under `lib/` and `page/`, the four UI shell files, every path in `ui/vendor/magpie/static-manifest.json` prefixed with `ui/`, and that static manifest itself. SHA-256 input is each UTF-8 path + NUL + file bytes + NUL; documentation/tests/provenance-only snapshots are excluded.
+
+### Current results
+
+| Check | Native-copy result / evidence |
+|---|---|
+| Unit/API suite | **167 passed, 1 explicit browser-only skip, 0 failures** (168 total). The skipped browser fixture is run separately below. Versioned release rerun: `artifacts/native-routing/release-unit.log`. |
+| Production-service Chromium | **16/16 passed**, including enclosing test. Release rerun: `artifacts/native-routing/release-chromium-corrected.log`. |
+| Production-service WebKit | **16/16 passed**, existing isolated library runner. Release rerun: `artifacts/native-routing/release-webkit-corrected.log`. No dependency/system installation. |
+| Independent three-way comparison | **10/10 passed in each engine**, including eight desktop/mobile × light/dark × reduced/normal-motion variants. Original upstream → extraction and extraction → session patch are separate comparisons; the observed differences below are retained, not asserted away. `artifacts/native-routing/{chromium,webkit}-parity-tests.log` and `*-parity-matrix.json`. |
+| Syntax / package / provenance | **Passed:** 46 JavaScript files, deterministic generator `--check`, exact 229-file package below 6 MiB. Original CSS and relevant destination/flight source ranges remain byte-equal; native `LIVE = 4`, startup/resume slice and four-source policy remain unchanged. No pristine/test-only source is served or packaged. |
+| Actual Magpie/Bun | **13/13 checks passed**, pinned Magpie v0.1.3124 / genuine Bun 1.4.2 / Node v24.18.0. Release-candidate rerun `artifacts/integration/run-3JE5Ae/result.json`, completion `2026-11-09T04:18:36.695Z`, `referenceUnchanged: true`; previous native-copy run `run-UBk5rk` also passed. This adds native-endpoint shared-seat/privacy/query/auth/static checks to the earlier twelve checks. |
+| Screenshot inspection | 48 matrix screenshots plus supplementary concurrent-session captures were generated. Original/extracted/session desktop light, mobile dark, concurrent sessions and production-service multi-route mobile screenshots were opened and visually inspected. |
+| Distribution / deployment | **v0.3.0 targets GitHub source/tag/release distribution, not npm or a cluster deployment.** Publication and commit-specific CI are independently visible in GitHub. This does not fix or certify the user's Authentik/Ingress path. |
+
+Production-service tests use the real plugin HTTP server, aggregator, protected endpoint and packaged assets in a protocol-shaped opaque iframe. They cover two tabs/one collector; exact agent/session sources; shared destinations; source-local folders; no rekey on model/parent changes; unknown identities; native four-flight cap; fifth-source refill; independently observed outbound/reply/replay endpoints; retry/fallback/terminal errors; concurrent narrative hold; keyboard folds; sky layering; idle frames; hidden/stale/revoked/reset states; first-use setup; locale changes; and desktop/mobile overflow under both themes/motion settings. They replace obsolete custom-renderer assertions, not merely skip them. Existing scoped/history API, privacy and lifecycle tests remain.
+
+The actual-host harness uses independent network/PID namespaces, synthetic HOME/config/work and loopback-only providers. It checks the authentic CLI/Bun/WebUI HTTP path and removes synthetic state/processes afterward. **Browser rendering is tested separately, not as an end-to-end browser session inside actual Magpie.** No real agent files, provider credentials, external model requests or live configuration were used.
+
+### Observed parity differences — not pixel-identical
+
+1. **Original → extraction:** at equal 956px desktop block width, retained stage/source/hub/account/caption/statistics/steps geometry and sampled styles match. Configured-account counts and body/usage/editor actions are deliberately absent because this read-only service has neither full inventory nor permission to disclose raw content. On mobile, removing those actions reduces the log header from 90px to 44px (46px less block height); the routing-stage geometry is unchanged. Normal-motion Chromium records occasional approximately 0.00003px wire-coordinate differences, left visible in the reports.
+2. **Extraction → session patch:** the new source subtitle/tooltip identifies the session. In the desktop fixture, native `fit-content` sizing grows the source from **124px to 137.69px**, shifts hub/account rows about **13.69px**, and narrows the account column. Mobile one-session geometry is unchanged. No CSS workaround or replacement layout was introduced. This desktop reflow is a visible difference requiring review, not a claim of pixel-identical parity.
+3. **Safety/data adaptations:** custom names become stable neutral labels, missing inventory/measurements/outcomes remain unavailable, unsupported explanations are withheld, and lower configuration/body/context actions are excluded. Full details are in [native-copy provenance](native-copy-provenance.md). Passing comparison tests do not mean these differences vanished.
+4. **Localization:** copied native translations were exercised in en, zh, zh-TW, ja and de. New unavailable-evidence/outcome/time messages currently fall back to English; their localization is incomplete.
+
+Primary local screenshots:
+- [Three-way comparison sheet, same fixture](../artifacts/native-routing/native-copy-comparison.png)
+- [Original native, desktop light](../artifacts/native-routing/chromium-desktop-light-reduce-native-original.png)
+- [Extraction-only, identical fixture](../artifacts/native-routing/chromium-desktop-light-reduce-extracted-baseline.png)
+- [Session patch, identical fixture](../artifacts/native-routing/chromium-desktop-light-reduce-session-patched.png)
+- [Two sessions, original shared destination rows](../artifacts/native-routing/chromium-sessions.png)
+- [Original native, WebKit mobile dark](../artifacts/native-routing/webkit-mobile-dark-reduce-native-original.png)
+- [Session patch, WebKit mobile dark](../artifacts/native-routing/webkit-mobile-dark-reduce-session-patched.png)
+
+These artifacts are local and intentionally excluded from the distributable. The evidence directory is `artifacts/native-routing/`; protected-service screenshots are under `artifacts/browser/native-service/`.
+
+### Remaining boundaries
+
+- Merge/release was explicitly requested after the screenshots and desktop reflow were presented. No separate statement of pixel-identical visual acceptance was made; automated tests and release authorization do not establish that claim.
+- Relevant upper-stage regressions were adapted, not the whole Magpie test suite or every combination of partial evidence.
+- WebKit retains the documented headless native pointer/wheel activation workaround. Playwright's screenshot-only `body {}` injection is narrowly identified and excluded from application-error counting after verifying the injected text; production CSP still blocks it. An initial packet assertion selected a canceled historical packet; the implementation-phase test was corrected to track a held flight. The first v0.3.0 release rerun nevertheless failed a separate lifetime packet-count assertion (`6 !== 3`, 14 passed / 2 failed including the enclosing test), recorded in `artifacts/native-routing/release-webkit.log`; it is not counted as a pass. A controlled real 1.2s main-thread stall reproduced the same `6 !== 3` result with a measured 1246ms frame gap: native `frame → resume → stopPlays` canceled three outbound packets, then three replacements returned correctly. The original failed run did not record its triggering gap duration. The regression now deliberately exercises real host hide/resume, distinguishes canceled observation history from the exact three held packets, verifies their source endpoints, and requires two unchanged polls plus completion to create no extra/replacement flights; replay must create exactly one. Runtime/animation code is unchanged. The corrected full Chromium and WebKit suites each pass 16/16; no assertion retries, forced clicks or failure filtering were added.
+- Physical-device Safari, actual Docker/remote HTTPS deployment and real agent executables remain unverified. The existing sandbox persistence limitation remains; the new upper block has no session selector.
+
+Results in the release sections below are historical and do not certify the native-copy replacement.
+
 ## v0.2.0 visual redesign — 2026-11-08
 
 Version `0.2.0` replaces the card-based interface with a diagram-first routing stage; the original `v0.1.0` tag remains unchanged. Its runtime fingerprint, calculated by the method below, is `6713f01f546debf1176657b40265f819990dea8356ff327e163299d1c628b3e7`. The backend, launcher, authorization bridge and Magpie reference source were not changed.
@@ -15,6 +65,7 @@ Version `0.2.0` replaces the card-based interface with a diagram-first routing s
 | Real Magpie/Bun | **12 checks passed** again with the redesigned package, Magpie v0.1.3124 / Bun 1.4.2 / Node v24.18.0; completion `2026-11-08T15:36:12.387Z`, `referenceUnchanged: true`. Result: `artifacts/integration/run-ChmlQj/result.json` and `artifacts/integration/latest-result.json`. This validates actual host/API integration, not browser rendering through the external deployment. |
 | Default-view inspection | Desktop light/dark and mobile dark screenshots were opened and compared with the native Routing stage. One shared diagram is primary; Details is closed, without an initial metric grid or request log. |
 | Distribution/deployment | GitHub source tag/release `v0.2.0`; not published to npm or installed into the user's cluster by this work. Authentik/Ingress CSP behavior is separate; a successful localhost port-forward does not prove the external HTTPS path works. |
+| Historical CI follow-up | Main-branch run [42495804710](https://github.com/tsunheimat/magpie-session-route-plugin/actions/runs/42495804710) passed all four jobs. The later same-commit tag run [42496037982](https://github.com/tsunheimat/magpie-session-route-plugin/actions/runs/42496037982) failed Chromium and canceled WebKit; both unit jobs passed. The earlier green run does not override that tag-run failure. |
 
 Browser coverage retains two-tab isolation, late-response rejection, setup/privacy, history accounting and replay invariants. New checks cover closed/lazy Details, exact same-label destination separation, bounded omission indicators, source/path interaction, stable DOM nodes and wires across polls, zero-candidate/orphan evidence, and normal-motion flights that do not resend on unchanged snapshots. Motion is tested through completion, stale/disconnected state, parent visibility, reduced motion, history, replay, scope changes and backend replacement. Keyboard/touch, long labels, dense graphs, both themes and open/closed details are exercised.
 
@@ -64,9 +115,9 @@ The twelve recorded checks cover containment; local-path plugin installation thr
 
 The integration script cleans its synthetic HOME/work directories and spawned processes, retaining only redacted diagnostics/results. Source-immutability checks passed. No Docker or real Internet service was substituted for the explicit containment requirements.
 
-## Acceptance matrix
+## Historical release acceptance matrix
 
-“Covered” below names evidence, not a blanket claim that every production deployment scenario passed.
+This matrix describes the earlier v0.1.0/v0.2.0 scope and evidence. Selector/Details/history-panel assertions do not describe the corrected native upper block. Current native-copy results and remaining differences are listed at the top of this document; backend scope/history contracts remain tested separately. “Covered” names evidence, not a blanket claim that every production deployment scenario passed.
 
 | ID | Acceptance criterion | Current evidence / remaining boundary |
 |---|---|---|
