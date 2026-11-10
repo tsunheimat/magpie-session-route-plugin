@@ -1,5 +1,9 @@
 # Native upper Routing provenance
 
+## v0.3.4 project labels and visible children
+
+Project-present source subtitles now display only the recorded project basename(s), without the short session suffix. The original exact-session key, full-session tooltip and no-project fallback remain unchanged. Child activity uses a plain source-local container and scrollable list instead of `details`/`summary`: relevant children always show, with no chevron, toggle listener or fold state. The list retains keyboard focus, touch scrolling, overflow disclosure and request-activity metadata; no child evidence means no wrapper or residual child spacing. Native destination folding and flight algorithms are untouched.
+
 ## v0.3.3 client/model-only children
 
 Version 0.3.3 keeps native depth-1 indentation and row/model styling, but removes the visible activity heading, repeated actor label and state pill. Children use the same `icon(agentOf(agent)?.icon || "generic")` client lookup as their parent rather than the routing-group `FAN` artwork. Only client artwork and model names are visible in each row. The disclosure remains a keyboard/touch-operable chevron with an accessible name; request state/counts and unknown identity are secondary tooltip/accessibility information.
@@ -55,7 +59,7 @@ The copied ingestion receives the sanitized whole-snapshot contract (`apiVersion
 
 Known sources use `JSON.stringify(['session', agent, recordedSession])`. Unknown sources use a separately tagged agent/generation/request-ID/time tuple. Model, provider, folder and parent session do not rekey a known source. A session shares one original source node; each request keeps its own native flight and replay identity. The right-side opaque seat identities are shared across requests, supplied by the backend, not request-namespaced or inferred from labels.
 
-The recorded session is the effective gateway identity. An overridden/truncated native session header cannot be recovered. Private session titles are not collected. The native `<small>` subtitle now prioritizes a recorded project basename when available alongside the short session discriminator, including single-project sessions. Model/full-session evidence remains in its tooltip; recorded folder values remain separately opt-in. Project labels never become source identity.
+The recorded session is the effective gateway identity. An overridden/truncated native session header cannot be recovered. Private session titles are not collected. The native `<small>` subtitle now shows recorded project basename(s) alone when available, including single-project sessions. Without project disclosure the existing short-session/model fallback remains. Model/full-session evidence remains in its tooltip; recorded folder values remain separately opt-in. Project labels never become source identity.
 
 **Unchanged native limits:** four visible source admissions, and independently `LIVE = 4` with `underWay().slice(-LIVE)` for startup/resume requests. Six concurrent startup requests from one session do not start six flights: only the native last four start. The patch does not expand that scheduler.
 

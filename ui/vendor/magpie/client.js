@@ -1953,21 +1953,15 @@ function routingPage(host) {
       return;
     }
     if (!a.activity) {
-      const node = el("details", "rt-activity"), summary = el("summary"), chev = el("span", "chev"),
-        list = el("ul", "rt-actors"), overflow = el("span", "rt-activity-overflow");
-      setAttr(summary, "aria-label", t("Toggle model activity"));
-      chev.append(svg(CHEV, 12, 1.7));
-      chev.setAttribute("aria-hidden", "true");
-      summary.append(chev);
-      setAttr(summary, "title", t("Gateway request activity only; task completion is unknown."));
-      node.open = true;
+      const node = el("div", "rt-activity"), list = el("ul", "rt-actors"),
+        overflow = el("span", "rt-activity-overflow");
+      setAttr(list, "title", t("Gateway request activity only; task completion is unknown."));
       list.tabIndex = 0;
-      node.append(summary, list, overflow);
+      node.append(list, overflow);
       a.node.append(node);
-      const activity = a.activity = { node, summary, list, overflow, entries: new Map() };
+      const activity = a.activity = { node, list, overflow, entries: new Map() };
       // Viewport limits presentation only, never the number of observed actors.
       activity.measure = () => {
-        if (!node.open) return;
         const box = list.getBoundingClientRect();
         const outside = [...list.children].filter((n) => {
           const r = n.getBoundingClientRect();
@@ -1976,7 +1970,6 @@ function routingPage(host) {
         setText(overflow, outside ? t("{n} activity entries outside view; scroll to view all", { n: outside }) : "");
       };
       list.addEventListener("scroll", activity.measure, { passive: true });
-      node.addEventListener("toggle", activity.measure);
     }
     const { list, entries, measure } = a.activity, models = actorModels(requests), agent = requests[0].agent;
     for (const [id, e] of entries) if (!groups.has(id)) { e.node.remove(); entries.delete(id); }
@@ -2230,7 +2223,7 @@ function routingPage(host) {
       // Project disclosure is independent of full-folder disclosure. Never infer it from folder.
       const projects = [...new Set(relevant.map((x) => x.projectName).filter(Boolean))];
       // told again every second (countdown): only what changed is written
-      setText(a.sub, projects.length ? projects.map(lastLevel).join(", ") + " · " + sourceLabel(r) : sourceLabel(r) + " · " + r.model);
+      setText(a.sub, projects.length ? projects.map(lastLevel).join(", ") : sourceLabel(r) + " · " + r.model);
       const tip = [agentName(r.agent), r.model, r.session ? t("Session id") + ": " + r.session : sourceLabel(r), ...projects, ...fs.map((f) => t("Folder") + ": " + f)].join("\n");
       if (a.node.title !== tip) a.node.title = tip;
     }
