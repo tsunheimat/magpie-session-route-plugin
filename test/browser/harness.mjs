@@ -56,6 +56,8 @@ const hostScript = `(() => {
       event.source.postMessage({magpie:1,id,result},'*');
     }catch{event.source.postMessage({magpie:1,id,error:'Refused'},'*');}
   });
+  // The child's one-shot hello must never race the parent listener.
+  frame.src = ${JSON.stringify(`${PREFIX}index.html`)};
 })();`;
 
 async function listen(server, port = 0) {
@@ -122,7 +124,7 @@ export async function browserHarness({ unprovisioned = false, fixture = nativeTr
     try {
       if (req.url === '/') {
         res.setHeader('Content-Type', 'text/html');
-        res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Plugin test host</title><script src="/host.js" defer></script><style>html,body{margin:0;height:100%;}iframe{border:0;width:100%;height:100%;display:block;}</style></head><body><iframe title="Session Routing" sandbox="allow-scripts" referrerpolicy="no-referrer" src="${PREFIX}index.html"></iframe></body></html>`);
+        res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Plugin test host</title><script src="/host.js" defer></script><style>html,body{margin:0;height:100%;}iframe{border:0;width:100%;height:100%;display:block;}</style></head><body><iframe title="Session Routing" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe></body></html>`);
         return;
       }
       if (req.url === '/host.js') { res.setHeader('Content-Type', 'text/javascript'); res.end(hostScript); return; }
