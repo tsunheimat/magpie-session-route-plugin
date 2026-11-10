@@ -21,7 +21,7 @@ async function waitUntil(check, message) {
     await new Promise(resolve => setTimeout(resolve, 40));
   }
 }
-export async function contextFor(browser, harness, viewport = { width: 1280, height: 900 }, reducedMotion = 'reduce', init) {
+export async function contextFor(browser, harness, viewport = { width: 1280, height: 900 }, reducedMotion = 'reduce', init, beforeNavigate) {
   const context = await browser.newContext({ viewport, reducedMotion, hasTouch: viewport.width <= 660 });
   context.setDefaultTimeout(10_000);
   if (init) await context.addInitScript(init);
@@ -50,9 +50,16 @@ export async function contextFor(browser, harness, viewport = { width: 1280, hei
     else if (/Content Security Policy|violates.*policy|Refused to (?:load|execute|apply)/i.test(text)) csp.push(text);
     else if (msg.type() === 'error' && /canvas|image data|cross-origin/i.test(text)) errors.push(text);
   });
+  await beforeNavigate?.(page);
   await page.goto(harness.url);
   const frame = page.frameLocator('iframe');
-  await frame.locator('button').first().waitFor();
+  // Provisioned launchers never show setup; retry is failure, not readiness.
+  await frame.locator('#rt:visible, #launch-setup:visible, #launch-retry:visible').first().waitFor();
+  if (await frame.locator('#launch-retry').isVisible()) {
+    const message = await frame.locator('#launch-status').innerText();
+    await context.close();
+    assert.fail(`Launcher failed: ${message}`);
+  }
   if (engineName === 'webkit') {
     await page.mouse.move(viewport.width / 2, viewport.height / 2); await page.mouse.wheel(0, 1);
   }
@@ -202,6 +209,44 @@ await test(`${engineName}: copied native upper block through the production opaq
     assert(!h.page.frames().some(f => f.url().includes(harness.options.apiToken)));
     assert(!harness.observations.some(r => r.path.includes(harness.options.apiToken)));
     await noOverflow(service, 'desktop boot'); await capture(h.page, h.frame, 'boot'); noErrors(h);
+  });
+
+  await t.test('parent bridge listens before child navigation and awaits delayed options without setup', async t => {
+    const harness = await browserHarness(); t.after(() => harness.close());
+    let releaseHost, hostWaiting, releaseOptions, optionsWaiting, page;
+    const hostGate = new Promise(resolve => { releaseHost = resolve; });
+    const hostReached = new Promise(resolve => { hostWaiting = resolve; });
+    const optionsGate = new Promise(resolve => { releaseOptions = resolve; });
+    const optionsReached = new Promise(resolve => { optionsWaiting = resolve; });
+    t.after(() => { releaseHost(); releaseOptions(); });
+    const boot = contextFor(browser, harness, undefined, undefined, undefined, async p => {
+      page = p; t.after(() => p.context().close());
+      await p.route('**/host.js', async route => { hostWaiting(); await hostGate; await route.continue(); });
+      let first = true;
+      await p.route('**/_test/options', async route => {
+        if (first && route.request().method() === 'GET') {
+          first = false; optionsWaiting(); await optionsGate;
+        }
+        await route.continue();
+      });
+    });
+    // Keep rejection handled even if an earlier ordering assertion fails.
+    void boot.catch(() => {});
+    await hostReached;
+    await page.locator('iframe').waitFor({ state: 'attached' });
+    assert.equal(await page.locator('iframe').getAttribute('src'), null,
+      'child navigation must not precede the parent message listener');
+    releaseHost();
+    await optionsReached;
+    const launcher = page.frameLocator('iframe');
+    assert.equal(await launcher.locator('#launch-setup').getAttribute('hidden'), '');
+    assert.equal(await launcher.locator('#launch-retry').getAttribute('hidden'), '');
+    assert.equal(serviceFrame(page), undefined, 'pending options are not service readiness');
+    releaseOptions();
+    const h = await boot; await readyStage(h.page, h.frame);
+    assert.equal(await h.frame.locator('#launch-setup').count(), 0);
+    assert.equal(harness.collectorStarts, 1);
+    noErrors(h);
   });
 
   await t.test('two tabs share one collector while exact agents/sessions and unknown requests stay separate', async t => {

@@ -1,6 +1,6 @@
 # Compatibility
 
-**v0.3.3: client/model-only child rows.** The pinned native source and deployment floor are unchanged. This correction simplifies source-local presentation and adds a bounded, evidence-derived requested-model display field, retaining earlier project/provider display improvements. Unit/API verification passes 189 tests plus a separately exercised browser fixture; protected-service suites pass 20 tests and native comparison suites pass 18 tests in each engine. See [validation](validation.md) for version-specific release and host-integration evidence and [provenance](native-copy-provenance.md) for deliberate source/data changes.
+**v0.3.3: client/model-only child rows.** The pinned native source and deployment floor are unchanged. This correction simplifies source-local presentation and adds a bounded, evidence-derived requested-model display field, retaining earlier project/provider display improvements. Unit/API verification passes 189 tests plus a separately exercised browser fixture; protected-service release suites pass 21 tests and native comparison suites pass 18 tests in each engine. See [validation](validation.md) for version-specific release and host-integration evidence and [provenance](native-copy-provenance.md) for deliberate source/data changes.
 
 ## Verified reference
 
