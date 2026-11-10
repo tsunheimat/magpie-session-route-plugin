@@ -119,9 +119,14 @@ async function assertClientModelRows(source, expectedIcon) {
     assert.equal(row.icon, row.parentIcon, 'child artwork uses exactly the parent client icon token');
   }
   assert.equal(await source.locator('.rt-actor b,.rt-actor i,.rt-actor > svg,.rt-actor-label,.rt-actor-state').count(), 0);
-  assert.equal(await source.locator('summary').textContent(), '');
-  assert.equal(await source.locator('summary').getAttribute('aria-label'), 'Toggle model activity');
-  assert.equal(await source.locator('summary').evaluate(n => n.children.length === 1 && n.firstElementChild.matches('.chev[aria-hidden="true"]')), true);
+  assert.equal(await source.locator('details,summary,button,.chev,[aria-expanded],[open]').count(), 0, 'source activity has no disclosure controls or collapse state');
+  assert.equal(await source.locator('.rt-activity').evaluate(n => n.matches('div.rt-activity') && n.children.length === 2 &&
+    n.firstElementChild.matches('ul.rt-actors') && n.lastElementChild.matches('span.rt-activity-overflow')), true);
+  assert.equal(await source.locator('.rt-activity').isVisible(), true);
+  assert.equal(await source.locator('.rt-actors').isVisible(), true, 'relevant activity is visible without a show/hide action');
+  assert.equal(await source.locator('.rt-actor').evaluateAll(ns => ns.every(n => n.getBoundingClientRect().height > 0)), true);
+  assert.equal(await source.locator('.rt-actors').getAttribute('tabindex'), '0');
+  assert.equal(await source.locator('.rt-actors').getAttribute('title'), 'Gateway request activity only; task completion is unknown.');
   assert.equal(await source.locator('.rt-actors').getAttribute('aria-label'), 'Model request activity — scroll for all activity');
 }
 
@@ -184,6 +189,7 @@ await test(`${engineName}: copied native upper block through the production opaq
     const service = await readyStage(h.page, h.frame);
     assert.equal(await h.frame.locator('.rt-stage').count(), 1);
     assert.equal(await h.frame.locator('.rt-src').count(), 2);
+    assert.equal(await h.frame.locator('.rt-src .rt-activity,.rt-src .rt-actors').count(), 0, 'sources without relevant child activity have no extra wrapper or geometry');
     assert.equal(await h.frame.locator('.rt-accts>li').count(), 2, 'same account rows stay shared across sessions');
     assert.deepEqual(await h.frame.locator('.rt-src b').allTextContents(), ['Claude Code', 'Claude Code']);
     await service.waitForFunction(() => [...document.querySelectorAll('.rt-src img,.rt-accts img')].every(img => img.complete && img.naturalWidth > 0 && img.crossOrigin === 'anonymous'));
@@ -360,8 +366,10 @@ await test(`${engineName}: copied native upper block through the production opaq
     fixture.routes.forEach((r, i) => { r.folder = ['workspace/magpie', 'src/engine', 'src/dial'][i]; r.parentSession = 'shared-parent'; });
     const harness = await browserHarness({ fixture, showFolders: true }); t.after(() => harness.close());
     const h = await contextFor(browser, harness); t.after(() => h.context.close()); const service = await readyStage(h.page, h.frame);
-    const a = h.frame.locator('.rt-src').filter({ hasText: 'alpha' });
-    const b = h.frame.locator('.rt-src').filter({ hasText: 'bravo' });
+    const a = h.frame.locator('.rt-src[title*="Session id: alpha"]');
+    const b = h.frame.locator('.rt-src[title*="Session id: bravo"]');
+    assert.equal(await a.locator(':scope > small').textContent(), 'magpie, engine');
+    assert.equal(await b.locator(':scope > small').textContent(), 'dial');
     assert.match(await a.getAttribute('title'), /Folder: workspace\/magpie\nFolder: src\/engine/);
     assert.doesNotMatch(await a.getAttribute('title'), /dial/);
     assert.match(await b.getAttribute('title'), /Folder: src\/dial/);
@@ -374,6 +382,8 @@ await test(`${engineName}: copied native upper block through the production opaq
     assert.equal(await service.evaluate(() => folderNodes.every(n => n.isConnected)), true);
     assert.equal(await h.frame.locator('.rt-src').count(), 2);
     assert.match(await a.getAttribute('title'), /Folder: new\/module/); assert.doesNotMatch(await b.getAttribute('title'), /module/);
+    assert.equal(await a.locator(':scope > small').textContent(), 'magpie, module');
+    assert.equal(await b.locator(':scope > small').textContent(), 'dial');
     noErrors(h);
   });
 
@@ -417,7 +427,7 @@ await test(`${engineName}: copied native upper block through the production opaq
     noErrors(h);
   });
 
-  await t.test('one recorded project is visible without disclosing its parent path', async t => {
+  await t.test('equal project-only labels keep exact sessions, tooltips and source nodes distinct', async t => {
     const fixture = nativeTrace({ sessions: ['alpha', 'bravo'] });
     fixture.routes[0].folder = 'private-parent/same-project';
     fixture.routes[1].folder = 'C:\\private-parent\\same-project';
@@ -425,9 +435,24 @@ await test(`${engineName}: copied native upper block through the production opaq
     const h = await contextFor(browser, harness); t.after(() => h.context.close());
     const service = await readyStage(h.page, h.frame);
     const subtitles = await h.frame.locator('.rt-src > small').allTextContents();
-    assert.equal(subtitles.length, 2);
-    assert(subtitles.every(text => text.includes('same-project')));
-    assert(subtitles.some(text => text.includes('alpha')) && subtitles.some(text => text.includes('bravo')));
+    assert.deepEqual(subtitles, ['same-project', 'same-project']);
+    assert.equal(await h.frame.locator('.rt-src').count(), 2, 'equal project names never merge recorded sessions');
+    assert.deepEqual(await sourceTitles(h.frame), [
+      'Claude Code\nexample-model\nSession id: alpha\nsame-project',
+      'Claude Code\nexample-model\nSession id: bravo\nsame-project',
+    ]);
+    await service.evaluate(() => { window.projectSources = [...document.querySelectorAll('.rt-src')]; });
+    const before = reads(harness); await waitUntil(() => reads(harness) >= before + 3, 'unchanged same-project polls complete');
+    assert.equal(await service.evaluate(() => projectSources.every((n, i) => n === document.querySelectorAll('.rt-src')[i])), true);
+    fixture.routes[0].folder = 'private-parent/renamed-project'; fixture.routes[0].parentSession = 'bravo';
+    update(harness, fixture);
+    await service.waitForFunction(() => document.querySelector('.rt-src[title*="Session id: alpha"] > small')?.textContent === 'renamed-project');
+    assert.equal(await service.evaluate(() => projectSources.every((n, i) => n === document.querySelectorAll('.rt-src')[i])), true, 'project and parent changes do not rekey either source');
+    assert.deepEqual(await h.frame.locator('.rt-src > small').allTextContents(), ['renamed-project', 'same-project']);
+    assert.deepEqual(await sourceTitles(h.frame), [
+      'Claude Code\nexample-model\nSession id: alpha\nrenamed-project',
+      'Claude Code\nexample-model\nSession id: bravo\nsame-project',
+    ]);
     assert.doesNotMatch(JSON.stringify(harness.aggregator.nativeSnapshot()), /private-parent|C:/);
     assert.doesNotMatch(await h.frame.locator('#rt').innerText(), /private-parent/);
     assert((await sourceTitles(h.frame)).every(title => !title.includes('Folder:')));
@@ -437,8 +462,9 @@ await test(`${engineName}: copied native upper block through the production opaq
     const hidden = await browserHarness({ fixture, showProjectNames: false }); t.after(() => hidden.close());
     const other = await contextFor(browser, hidden); t.after(() => other.context.close());
     await readyStage(other.page, other.frame);
-    assert.doesNotMatch(await other.frame.locator('#rt').innerText(), /same-project|private-parent/);
-    assert.doesNotMatch(JSON.stringify(hidden.aggregator.nativeSnapshot()), /same-project|private-parent/);
+    assert.deepEqual(await other.frame.locator('.rt-src > small').allTextContents(), ['alpha · example-model', 'bravo · example-model'], 'no-project session/model fallback is unchanged');
+    assert.doesNotMatch(await other.frame.locator('#rt').innerText(), /same-project|renamed-project|private-parent/);
+    assert.doesNotMatch(JSON.stringify(hidden.aggregator.nativeSnapshot()), /same-project|renamed-project|private-parent/);
     noErrors(other);
   });
 
@@ -478,7 +504,7 @@ await test(`${engineName}: copied native upper block through the production opaq
     assert.match(await aggregate.getAttribute('title'), /Request identity unavailable/);
     assert.match(await aggregate.getAttribute('aria-label'), /Request identity unavailable/);
     assert.match(await codex.locator('.rt-actor').getAttribute('title'), /^Codex\nexample-model\nRequest active\n1 active requests; 0 ended requests$/);
-    assert.equal(await alpha.locator('summary').getAttribute('title'), 'Gateway request activity only; task completion is unknown.');
+    assert.equal(await alpha.locator('.rt-actors').getAttribute('title'), 'Gateway request activity only; task completion is unknown.');
     const activityDom = await h.frame.locator('.rt-activity').evaluateAll(ns => ns.map(n => n.outerHTML).join('\n'));
     assert.doesNotMatch(activityDom, /data-actor-id|actor_|private-actor|private-conflict|Sub-agent|子代理|group\/|Agent completed|Anthropic Workspace|Provider 01|Account 01/);
     assert.equal(await h.frame.locator('.rt-actor[role],.rt-actor[tabindex],.rt-actor[aria-expanded],.rt-actor.active,.rt-actor .chev').count(), 0);
@@ -490,15 +516,14 @@ await test(`${engineName}: copied native upper block through the production opaq
     await service.evaluate(() => {
       window.actorNodes = [...document.querySelectorAll('.rt-actor')];
       window.actorChips = [...document.querySelectorAll('.rt-actor code.mdl')];
+      window.actorLists = [...document.querySelectorAll('.rt-actors')];
     });
-    assert.notEqual(await alpha.locator('details').getAttribute('open'), null, 'activity starts expanded');
-    await alpha.locator('summary').focus(); await h.page.keyboard.press('Enter');
-    assert.equal(await alpha.locator('details').getAttribute('open'), null);
+    await alpha.locator('.rt-actors').focus(); await h.page.keyboard.press('Shift');
+    assert.equal(await alpha.locator('.rt-actors').evaluate(n => n.matches(':focus-visible') && getComputedStyle(n).boxShadow !== 'none'), true);
     const before = reads(harness); await waitUntil(() => reads(harness) >= before + 3, 'unchanged actor polls complete');
-    assert.equal(await service.evaluate(() => actorNodes.every((n,i) => n === document.querySelectorAll('.rt-actor')[i]) && actorChips.every(n => n.isConnected)), true);
-    assert.equal(await alpha.locator('details').getAttribute('open'), null, 'polls preserve disclosure choice');
-    await h.page.keyboard.press('Enter');
-    assert.notEqual(await alpha.locator('details').getAttribute('open'), null);
+    assert.equal(await service.evaluate(() => actorNodes.every((n,i) => n === document.querySelectorAll('.rt-actor')[i]) && actorChips.every(n => n.isConnected) && actorLists.every((n,i) => n === document.querySelectorAll('.rt-actors')[i])), true);
+    assert.equal(await alpha.locator('.rt-actors').evaluate(n => n === document.activeElement), true, 'unchanged polls preserve keyboard focus');
+    await assertClientModelRows(alpha, 'claudecode-color');
     for (const [size, width] of [['desktop', 1280], ['mobile', 390]]) {
       await h.page.setViewportSize({ width, height: 1000 });
       await service.waitForFunction(mobile => document.querySelector('#rt').classList.contains('max560') === mobile, size === 'mobile');
@@ -759,14 +784,25 @@ await test(`${engineName}: copied native upper block through the production opaq
         assert.equal(await h.frame.locator('.rt-src').count(), 4);
         const dense = h.frame.locator('.rt-src').filter({ has: h.frame.locator(':scope > small', { hasText: 'session-5-' }) });
         assert.equal(await dense.locator('.rt-actor').count(), 25, 'long lists retain all observed actors');
+        await assertClientModelRows(dense, 'claudecode-color');
         assert.equal(await dense.locator('.rt-actors').evaluate(n => getComputedStyle(n).touchAction), 'pan-y');
+        assert.equal(await dense.locator('.rt-actors').evaluate(n => n.clientHeight > 0 && n.clientHeight <= 180 && n.scrollHeight > n.clientHeight && getComputedStyle(n).overflowY === 'auto'), true, 'long activity keeps a bounded scroll viewport');
+        assert.match(await dense.locator('.rt-activity-overflow').textContent(), /outside view; scroll/);
         await dense.locator('.rt-actors').focus(); await h.page.keyboard.press('End');
-        await waitUntil(() => dense.locator('.rt-actors').evaluate(n => n.scrollTop > 0), 'long activity list scrolls to remaining entries');
+        await waitUntil(() => dense.locator('.rt-actors').evaluate(n => n.scrollTop > 0 && n.scrollTop + n.clientHeight >= n.scrollHeight), 'long activity list scrolls to its final entries');
         assert.equal(await dense.locator('.rt-actor code.mdl').first().getAttribute('title'), fixture.routes[5].model, 'truncated model remains available in full');
         if (name === 'mobile') {
-          await dense.locator('summary').tap(); assert.equal(await dense.locator('details').getAttribute('open'), null);
-          await dense.locator('summary').tap(); assert.notEqual(await dense.locator('details').getAttribute('open'), null);
+          await dense.locator('.rt-actors').tap({ position: { x: 8, y: 20 } });
+          await assertClientModelRows(dense, 'claudecode-color');
+          assert.equal(await dense.locator('.rt-actors').evaluate(n => n.scrollTop > 0), true, 'touching the scrollable list never collapses or resets it');
         }
+        await dense.locator('.rt-actors').evaluate(n => {
+          window.denseList = n; window.denseScroll = n.scrollTop; window.denseRows = [...n.children];
+        });
+        const before = reads(harness); await waitUntil(() => reads(harness) >= before + 3, 'unchanged dense activity polls complete');
+        assert.equal(await dense.locator('.rt-actors').evaluate(n => n === denseList && n.scrollTop === denseScroll && denseRows.every((row, i) => row === n.children[i])), true, 'polls preserve long-list nodes and scroll');
+        await dense.locator('.rt-actors').focus(); await h.page.keyboard.press('Home');
+        await waitUntil(() => dense.locator('.rt-actors').evaluate(n => n.scrollTop === 0), 'keyboard can return to the first activity row');
         for (const dark of [false, true]) {
           await h.page.evaluate(v => window.testTheme(v), dark);
           await service.waitForFunction(theme => document.documentElement.dataset.theme === theme, dark ? 'dark' : 'light');

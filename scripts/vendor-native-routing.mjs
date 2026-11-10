@@ -143,21 +143,15 @@ export const SOURCE_ACTIVITY = `
       return;
     }
     if (!a.activity) {
-      const node = el("details", "rt-activity"), summary = el("summary"), chev = el("span", "chev"),
-        list = el("ul", "rt-actors"), overflow = el("span", "rt-activity-overflow");
-      setAttr(summary, "aria-label", t("Toggle model activity"));
-      chev.append(svg(CHEV, 12, 1.7));
-      chev.setAttribute("aria-hidden", "true");
-      summary.append(chev);
-      setAttr(summary, "title", t("Gateway request activity only; task completion is unknown."));
-      node.open = true;
+      const node = el("div", "rt-activity"), list = el("ul", "rt-actors"),
+        overflow = el("span", "rt-activity-overflow");
+      setAttr(list, "title", t("Gateway request activity only; task completion is unknown."));
       list.tabIndex = 0;
-      node.append(summary, list, overflow);
+      node.append(list, overflow);
       a.node.append(node);
-      const activity = a.activity = { node, summary, list, overflow, entries: new Map() };
+      const activity = a.activity = { node, list, overflow, entries: new Map() };
       // Viewport limits presentation only, never the number of observed actors.
       activity.measure = () => {
-        if (!node.open) return;
         const box = list.getBoundingClientRect();
         const outside = [...list.children].filter((n) => {
           const r = n.getBoundingClientRect();
@@ -166,7 +160,6 @@ export const SOURCE_ACTIVITY = `
         setText(overflow, outside ? t("{n} activity entries outside view; scroll to view all", { n: outside }) : "");
       };
       list.addEventListener("scroll", activity.measure, { passive: true });
-      node.addEventListener("toggle", activity.measure);
     }
     const { list, entries, measure } = a.activity, models = actorModels(requests), agent = requests[0].agent;
     for (const [id, e] of entries) if (!groups.has(id)) { e.node.remove(); entries.delete(id); }
@@ -204,7 +197,6 @@ export const SOURCE_ACTIVITY = `
 `;
 const ACTIVITY_TRANSLATIONS = {
   'zh-TW': {
-    'Toggle model activity': '展開或收合模型活動',
     'Request identity unavailable': '無法識別請求來源',
     'Request active': '請求中',
     '{n} requests active': '{n} 個請求中',
@@ -239,7 +231,7 @@ export function sessionPatch(s) {
   p('...rs.filter((x) => x.agent === id)', '...rs.filter((x) => sourceKey(x) === id)');
   p('const n = now(), going = pinned ? [] : [...src().values()].filter((x) => sourceKey(x) === id && (!x.done || at(x.time) + (x.ms || 0) > n - LINGER));\n      const fs = foldersOf([...new Set([...going, ...rs.filter((x) => sourceKey(x) === id)])].sort((x, y) => x.id - y.id));',
     'const relevant = sourceRequests(id, rs), fs = foldersOf(relevant);\n      // Project disclosure is independent of full-folder disclosure. Never infer it from folder.\n      const projects = [...new Set(relevant.map((x) => x.projectName).filter(Boolean))];');
-  p('setText(a.sub, fs.length > 1 ? fs.map(lastLevel).join(", ") : r.model);', 'setText(a.sub, projects.length ? projects.map(lastLevel).join(", ") + " · " + sourceLabel(r) : sourceLabel(r) + " · " + r.model);');
+  p('setText(a.sub, fs.length > 1 ? fs.map(lastLevel).join(", ") : r.model);', 'setText(a.sub, projects.length ? projects.map(lastLevel).join(", ") : sourceLabel(r) + " · " + r.model);');
   p('const tip = [agentName(id), r.model, ...fs.map((f) => t("Folder") + ": " + f)].join("\\n");', 'const tip = [agentName(r.agent), r.model, r.session ? t("Session id") + ": " + r.session : sourceLabel(r), ...projects, ...fs.map((f) => t("Folder") + ": " + f)].join("\\n");');
   p('function agentNode(id, actualAgent = id) {', SOURCE_ACTIVITY + '\n  function agentNode(id, actualAgent = id) {');
   p('const n = now(), rs = staged();', 'const n = now(), rs = staged();\n    // Activity reads retained gateway truth, never the synthetic replay clock/status.\n    for (const [key, a] of agents) sourceActivity(a, sourceRequests(key, rs, routes, Date.now() + skew));');
@@ -356,8 +348,8 @@ export function generate({ upstream, check=false }={}) {
       {location:'duration / outcome / statistics', difference:'Missing measurements and outcomes say unavailable; missing totals use an em dash rather than invented zero.'},
       {location:'account labels and tooltips', difference:'Stable opaque backend handles and neutral names replace raw account identities; mask only hides these neutral labels. External live quota windows are not read.'},
       {location:'group / provider headings', difference:'Recorded safe provider names and bundled icon/preset metadata retain native precedence; unavailable or unsupported metadata uses neutral/generic fallback. Private group/account identities remain opaque and settings navigation is removed, not stubbed.'},
-      {location:'source names / model subtitles', difference:'Pinned built-in client labels/icons replace installed-client inventory. A separately disclosed project basename precedes the short session, including a single project; model and full session remain in the tooltip. No folder-to-project inference. Full folder metadata is separately opt-in.'},
-      {location:'source child activity / ui/style.css', difference:'Source-local child rows adapt pinned native nested-group spacing/borders (routing.css lines 71-107), with depth-1 indentation, the actual client icon and concrete observed model names only. No visible section/actor label, provider display name, state pill, ID or numbering. Verified requested-provider prefixes use requestedModelName; model namespaces stay intact. Request state/counts and unknown-identity evidence remain in tooltips/accessibility text. Opaque actor keys stay internal; one unknown-actor activity aggregate. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. A list-wide disclosure and keyboard/touch scroll expose all retained entries; no added actor cap. Only this scoped extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English.'},
+      {location:'source names / model subtitles', difference:'Pinned built-in client labels/icons replace installed-client inventory. A separately disclosed project basename is shown without an adjacent session ID, including a single project; model and full session remain in the tooltip. Without disclosed project metadata the existing session/model fallback remains. No folder-to-project inference. Full folder metadata is separately opt-in.'},
+      {location:'source child activity / ui/style.css', difference:'Source-local child rows adapt pinned native nested-group spacing/borders (routing.css lines 71-107), with depth-1 indentation, the actual client icon and concrete observed model names only. No visible section/actor label, provider display name, state pill, ID or numbering. Verified requested-provider prefixes use requestedModelName; model namespaces stay intact. Request state/counts and unknown-identity evidence remain in tooltips/accessibility text. Opaque actor keys stay internal; one unknown-actor activity aggregate. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. Child lists are always visible when observed, with no disclosure control; keyboard/touch scroll exposes all retained entries with no added actor cap. No activity wrapper remains when there are no observed children. Only this scoped extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English.'},
       {location:'gateway subtitle / clock', difference:'Collected process identity is shown without a gateway URL; missing source clock blocks live playback. Group clock configuration is unavailable.'},
       {location:'quota / formatting helpers', difference:'Recorded quota fields remain; provider-supplied display text, live windows, expiry inventory, currency preferences and exchange rates are not fetched. Native default number/USD formatting remains.'},
       {location:'transport / lifecycle', difference:'Authenticated bounded whole snapshots replace core polling; collector live status is not process ownership. Hidden/aborted/revoked and generation reset paths clear or pause native playback.'},
