@@ -55,6 +55,38 @@ test('native model and configured effort distinguish seats without request-quali
   assert.notEqual(a.order[0].id, a.order[3].id, 'same raw display label cannot merge two accounts');
 });
 
+test('model-only display strips only a demonstrated routing provider prefix, never model namespaces', () => {
+  const projector = createNativeProjector();
+  for (const provider of ['openai', 'custom-relay']) {
+    const raw = row(1, { provider, model: `${provider}/vendor/model`, requestedModelName: 'spoofed',
+      order: [seat('matched', { provider, model: 'vendor/model' })], tries: [attempt('matched', { model: 'vendor/model' })] });
+    const projected = projector.route(raw);
+    assert.equal(projected.requestedModelName, 'vendor/model');
+    assert.equal(projected.model, raw.model, 'native routing identity stays unchanged');
+    const served = projector.route({ ...raw, served: 'reply-vendor/actual-model' });
+    assert.equal(served.served, 'reply-vendor/actual-model', 'reply model namespace is not a routing prefix');
+    for (const patch of [
+      { model: 'Qwen/Qwen3.7-Max' }, { model: 'anthropic/claude-fable-5', provider: 'openrouter' },
+      { model: 'group/example' }, { tries: [] }, { order: [] },
+      { tries: [attempt('other', { model: 'vendor/model' })] },
+      { order: [seat('matched', { provider: 'unrelated', model: 'vendor/model' })] },
+      { order: [seat('matched', { provider, model: 'unrelated-model' })] },
+      { tries: [attempt('matched', { model: 'model' })] },
+    ]) assert.equal(projector.route({ ...raw, ...patch }).requestedModelName, undefined, JSON.stringify(patch));
+  }
+  assert.equal(projector.route(row(1, { requestedModelName: 'spoofed' })).requestedModelName, undefined);
+  const bounded = createNativeProjector({ limits: { candidates: 1, attempts: 1 } });
+  const raw = row(1, { model: 'openai/gpt-model',
+    order: [seat('unmatched'), seat('matched')], tries: [attempt('matched')] });
+  assert.equal(bounded.route(raw).requestedModelName, undefined, 'discarded candidates are not display evidence');
+  assert.equal(bounded.route({ ...raw, order: [seat('matched')], tries: [attempt('matched'), attempt('matched')] }).requestedModelName,
+    undefined, 'discarded final attempts are not display evidence');
+  for (const model of ['https://private.invalid/model', 'sk-ant-PRIVATE-CREDENTIAL', 'x'.repeat(300)]) {
+    assert.equal(projector.route(row(1, { model: `openai/${model}`, order: [seat('matched', { model })],
+      tries: [attempt('matched', { model })] })).requestedModelName, undefined);
+  }
+});
+
 test('all retained seat/rest/affinity/pin references use the same domain-separated opaque identity', () => {
   const rawID = 'same-raw-id', restKey = `${rawID}/gpt-model`;
   const rest = { key: restKey, model: 'gpt-model', until: later, why: 'rate', by: 'retry-after', status: 429,

@@ -1935,7 +1935,8 @@ function routingPage(host) {
       let group = groups.get(key);
       if (!group) groups.set(key, group = { active: new Set(), ended: new Set() });
       const model = concrete(r.served) ? r.served :
-        !r.evidence?.reasons?.includes("model_unavailable") && concrete(r.model) ? r.model : null;
+        !r.evidence?.reasons?.includes("model_unavailable") && concrete(r.model) ?
+          concrete(r.requestedModelName) ? r.requestedModelName : r.model : null;
       (r.done ? group.ended : group.active).add(model);
     }
     for (const [id, group] of groups) {
@@ -1952,13 +1953,12 @@ function routingPage(host) {
       return;
     }
     if (!a.activity) {
-      const node = el("details", "rt-activity"), summary = el("summary"),
-        label = el("span"), chev = el("span", "chev"),
+      const node = el("details", "rt-activity"), summary = el("summary"), chev = el("span", "chev"),
         list = el("ul", "rt-actors"), overflow = el("span", "rt-activity-overflow");
-      setText(label, t("Sub-agent activity"));
+      setAttr(summary, "aria-label", t("Toggle model activity"));
       chev.append(svg(CHEV, 12, 1.7));
       chev.setAttribute("aria-hidden", "true");
-      summary.append(label, chev);
+      summary.append(chev);
       setAttr(summary, "title", t("Gateway request activity only; task completion is unknown."));
       node.open = true;
       list.tabIndex = 0;
@@ -1978,19 +1978,19 @@ function routingPage(host) {
       list.addEventListener("scroll", activity.measure, { passive: true });
       node.addEventListener("toggle", activity.measure);
     }
-    const { list, entries, measure } = a.activity, models = actorModels(requests);
+    const { list, entries, measure } = a.activity, models = actorModels(requests), agent = requests[0].agent;
     for (const [id, e] of entries) if (!groups.has(id)) { e.node.remove(); entries.delete(id); }
     for (const [id, group] of groups) {
       let e = entries.get(id);
       if (!e) {
-        const node = el("li", "rt-actor"), label = el("b", "rt-actor-label"),
-          chips = el("span", "rt-actor-models"), state = el("i", "rt-actor-state"), fan = svg(FAN, 14, 1.5);
-        fan.setAttribute("aria-hidden", "true");
+        const node = el("li", "rt-actor"), chips = el("span", "rt-actor-models"),
+          client = icon(agentOf(agent)?.icon || "generic");
+        client.setAttribute("aria-hidden", "true");
         node.style.setProperty("--depth", 1);
-        node.append(fan, label, chips, state); list.append(node);
-        entries.set(id, e = { node, label, chips, state, models: "" });
+        node.append(client, chips); list.append(node);
+        entries.set(id, e = { node, chips, models: "" });
       }
-      const label = t(id ? "Sub-agent" : "Sub-agent activity"), names = models.get(id).map((m) => m ?? t("Unknown model"));
+      const names = models.get(id).map((m) => m ?? t("Unknown model"));
       const state = t(group.active > 1 ? "{n} requests active" : group.active ? "Request active" : "Requests ended", { n: group.active });
       const signature = JSON.stringify(names);
       if (signature !== e.models) {
@@ -2001,12 +2001,14 @@ function routingPage(host) {
         }));
         e.models = signature;
       }
-      setText(e.label, label); setText(e.state, state);
-      setAttr(e.node, "title", [label, names.join(", "), state,
-        t("{active} active requests; {ended} ended requests", { active: group.active, ended: group.ended })].join("\n"));
+      const description = [agentName(agent), names.join(", "), state,
+        t("{active} active requests; {ended} ended requests", { active: group.active, ended: group.ended }),
+        ...(id ? [] : [t("Request identity unavailable")])].join("\n");
+      setAttr(e.node, "title", description);
+      setAttr(e.node, "aria-label", description);
       e.node.classList.toggle("on", group.active > 0);
     }
-    setAttr(list, "aria-label", t("Sub-agent gateway requests — scroll for all activity"));
+    setAttr(list, "aria-label", t("Model request activity — scroll for all activity"));
     measure();
   }
 
