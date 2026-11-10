@@ -94,6 +94,29 @@ export async function capture(page, frame, name) {
 const noErrors = h => { assert.deepEqual(h.errors, []); assert.deepEqual(h.csp, []); assert.deepEqual(h.blocked, []); };
 const sourceTitles = frame => frame.locator('.rt-src').evaluateAll(nodes => nodes.map(n => n.title));
 const reads = harness => harness.observations.filter(r => r.path === 'api/native-routing' && r.method === 'GET').length;
+async function assertClientModelRows(source, expectedIcon) {
+  assert.equal(await source.locator(':scope > .rt-ic > .ic').getAttribute('data-icon'), expectedIcon);
+  const rows = await source.locator('.rt-actor').evaluateAll(nodes => nodes.map(n => ({
+    text: n.textContent,
+    models: [...n.querySelectorAll('code.mdl')].map(chip => chip.textContent).join(''),
+    shape: n.children.length === 2 && n.firstElementChild.matches('.ic[aria-hidden="true"]') &&
+      n.lastElementChild.matches('span.rt-actor-models') && [...n.lastElementChild.children].every(c => c.matches('code.mdl')),
+    icon: n.firstElementChild.dataset.icon,
+    parentIcon: n.closest('.rt-src').querySelector(':scope > .rt-ic > .ic').dataset.icon,
+  })));
+  assert(rows.length > 0, 'the fixture exercises actual child rows');
+  for (const row of rows) {
+    assert.equal(row.text, row.models, 'models are the only child-row text: no labels, counts, provider or identity');
+    assert.equal(row.shape, true, 'only the client icon and model chips are present');
+    assert.equal(row.icon, expectedIcon);
+    assert.equal(row.icon, row.parentIcon, 'child artwork uses exactly the parent client icon token');
+  }
+  assert.equal(await source.locator('.rt-actor b,.rt-actor i,.rt-actor > svg,.rt-actor-label,.rt-actor-state').count(), 0);
+  assert.equal(await source.locator('summary').textContent(), '');
+  assert.equal(await source.locator('summary').getAttribute('aria-label'), 'Toggle model activity');
+  assert.equal(await source.locator('summary').evaluate(n => n.children.length === 1 && n.firstElementChild.matches('.chev[aria-hidden="true"]')), true);
+  assert.equal(await source.locator('.rt-actors').getAttribute('aria-label'), 'Model request activity — scroll for all activity');
+}
 
 // Observe the real native pose writes and frame callbacks; never replace flight
 // geometry, clocks or callbacks. Adapted from routing-idle-frame / sky-under.
@@ -374,7 +397,7 @@ await test(`${engineName}: copied native upper block through the production opaq
     noErrors(other);
   });
 
-  await t.test('native source-local child rows show observed models and request states without changing flight endpoints or caps', async t => {
+  await t.test('client-icon/model-only children retain tooltip states, exact flight endpoints and native caps', async t => {
     const fixture = nativeTrace({ sessions: ['alpha', 'alpha', 'alpha', 'alpha', 'alpha', 'alpha', 'alpha', 'bravo', 'alpha'],
       agents: ['claude', 'claude', 'claude', 'claude', 'claude', 'claude', 'claude', 'claude', 'codex'] });
     const [main, first, helper, second, unknown, conflict, title, independent, otherAgent] = fixture.routes;
@@ -398,17 +421,21 @@ await test(`${engineName}: copied native upper block through the production opaq
     assert.equal(await bravo.locator('.rt-actor').count(), 1, 'independent recorded session is not reparented');
     assert.equal(await codex.locator('.rt-actor').count(), 1, 'same opaque actor and session under another agent stays independent');
     const known = alpha.locator('.rt-actor').nth(0), sameModel = alpha.locator('.rt-actor').nth(1), aggregate = alpha.locator('.rt-actor').nth(2);
-    assert.deepEqual(await alpha.locator('b.rt-actor-label').allTextContents(), ['Sub-agent', 'Sub-agent', 'Sub-agent activity']);
+    await assertClientModelRows(alpha, 'claudecode-color');
+    await assertClientModelRows(bravo, 'claudecode-color');
+    await assertClientModelRows(codex, 'codex-color');
     assert.deepEqual(await known.locator('code.mdl').allTextContents(), ['a-model', 'z-model']);
     assert.deepEqual(await sameModel.locator('code.mdl').allTextContents(), ['a-model']);
     assert.deepEqual(await aggregate.locator('code.mdl').allTextContents(), ['example-model', 'Unknown model']);
-    assert.equal(await known.locator('i.rt-actor-state').innerText(), '2 requests active');
-    assert.equal(await sameModel.locator('i.rt-actor-state').innerText(), 'Request active');
-    assert.equal(await aggregate.locator('i.rt-actor-state').innerText(), '2 requests active');
-    assert.equal(await alpha.locator('summary').innerText(), 'Sub-agent activity');
+    assert.equal(await known.getAttribute('title'), 'Claude Code\na-model, z-model\n2 requests active\n2 active requests; 0 ended requests');
+    assert.equal(await sameModel.getAttribute('title'), 'Claude Code\na-model\nRequest active\n1 active requests; 0 ended requests');
+    assert.match(await aggregate.getAttribute('title'), /^Claude Code\nexample-model, Unknown model\n2 requests active\n2 active requests; 0 ended requests/);
+    assert.match(await aggregate.getAttribute('title'), /Request identity unavailable/);
+    assert.match(await aggregate.getAttribute('aria-label'), /Request identity unavailable/);
+    assert.match(await codex.locator('.rt-actor').getAttribute('title'), /^Codex\nexample-model\nRequest active\n1 active requests; 0 ended requests$/);
     assert.equal(await alpha.locator('summary').getAttribute('title'), 'Gateway request activity only; task completion is unknown.');
     const activityDom = await h.frame.locator('.rt-activity').evaluateAll(ns => ns.map(n => n.outerHTML).join('\n'));
-    assert.doesNotMatch(activityDom, /data-actor-id|actor_|private-actor|private-conflict|Sub-agent [#\d]|group\/|Agent completed/);
+    assert.doesNotMatch(activityDom, /data-actor-id|actor_|private-actor|private-conflict|Sub-agent|子代理|group\/|Agent completed|Anthropic Workspace|Provider 01|Account 01/);
     assert.equal(await h.frame.locator('.rt-actor[role],.rt-actor[tabindex],.rt-actor[aria-expanded],.rt-actor.active,.rt-actor .chev').count(), 0);
     assert.equal(await h.frame.locator('.rt-actor').evaluateAll(ns => ns.every(n => n.classList.contains('on') && n.style.getPropertyValue('--depth') === '1')), true);
     assert.doesNotMatch(await h.frame.locator('#rt').innerText(), /private-actor|private-conflict|private-parent/);
@@ -433,7 +460,9 @@ await test(`${engineName}: copied native upper block through the production opaq
       for (const dark of [false, true]) {
         await h.page.evaluate(v => window.testTheme(v), dark);
         await service.waitForFunction(theme => document.documentElement.dataset.theme === theme, dark ? 'dark' : 'light');
-        await noOverflow(service, `sub-agent activity ${size} ${dark ? 'dark' : 'light'}`);
+        await noOverflow(service, `client/model activity ${size} ${dark ? 'dark' : 'light'}`);
+        await assertClientModelRows(alpha, 'claudecode-color');
+        await assertClientModelRows(codex, 'codex-color');
         await capture(h.page, h.frame, `nested-subagents-${size}-${dark ? 'dark' : 'light'}`);
       }
     }
@@ -448,7 +477,9 @@ await test(`${engineName}: copied native upper block through the production opaq
       assert.equal(flight.last.near.title, flight.first.near.title, 'reply returns to the exact agent and session, including same-session Codex');
     }
     await service.waitForFunction(() => !document.querySelector('.rt-actor.on'));
-    assert.deepEqual(await h.frame.locator('.rt-actor-state').allTextContents(), Array(5).fill('Requests ended'));
+    assert.equal(await h.frame.locator('.rt-actor').evaluateAll(ns => ns.every(n => n.title.includes('\nRequests ended\n') && !n.classList.contains('on'))), true);
+    await assertClientModelRows(alpha, 'claudecode-color');
+    await assertClientModelRows(codex, 'codex-color');
     assert.deepEqual(await known.locator('code.mdl').allTextContents(), ['a-model', 'z-model']);
     fixture.routes = [main, independent]; fixture.ids = fixture.routes.map(r => r.id); update(harness, fixture);
     await service.waitForFunction(() => !document.querySelector('.rt-src[title*="Session id: alpha"] .rt-activity'));
@@ -456,6 +487,36 @@ await test(`${engineName}: copied native upper block through the production opaq
     harness.aggregator.setConnection({ status: 'stale', reason: 'gateway_unavailable' });
     await service.waitForFunction(() => !document.querySelector('.rt-src,.rt-actor,.rt-sky .pkt'));
     noErrors(h);
+  });
+
+  await t.test('generic client children preserve model namespaces and separate only evidenced provider prefixes', async t => {
+    const fixture = nativeTrace({ sessions: ['unknown-client-session'], agents: ['unregistered-client'], done: true });
+    const request = fixture.routes[0]; request.sub = 'private-unknown-client-actor';
+    request.model = 'org/requested/model'; request.served = 'org/served/model';
+    const harness = await browserHarness({ fixture }); t.after(() => harness.close());
+    const h = await contextFor(browser, harness); t.after(() => h.context.close());
+    const service = await readyStage(h.page, h.frame), source = h.frame.locator('.rt-src');
+    await source.locator('.rt-actor').waitFor();
+    await assertClientModelRows(source, 'generic');
+    assert.deepEqual(await source.locator('.rt-actor code.mdl').allTextContents(), ['org/served/model']);
+    assert.equal(await source.locator('.rt-actor').getAttribute('title'), 'unregistered-client\norg/served/model\nRequests ended\n0 active requests; 1 ended requests');
+    await service.evaluate(() => { window.genericRow = document.querySelector('.rt-actor'); window.genericIcon = genericRow.firstElementChild; });
+    delete request.served; update(harness, fixture);
+    await service.waitForFunction(() => document.querySelector('.rt-actor code.mdl')?.textContent === 'org/requested/model');
+    assert.deepEqual(await source.locator('.rt-actor code.mdl').allTextContents(), ['org/requested/model'], 'an arbitrary slash-qualified requested model is not stripped');
+    request.model = `${request.provider}/evidenced-model`;
+    request.tries[0].model = request.order[0].model = 'evidenced-model';
+    update(harness, fixture);
+    await service.waitForFunction(() => document.querySelector('.rt-actor code.mdl')?.textContent === 'evidenced-model');
+    assert.equal(harness.aggregator.nativeSnapshot().routes[0].requestedModelName, 'evidenced-model', 'matching request, attempt and provider seat prove the model field');
+    assert.deepEqual(await source.locator('.rt-actor code.mdl').allTextContents(), ['evidenced-model']);
+    assert.equal(await service.evaluate(() => genericRow === document.querySelector('.rt-actor') && genericIcon === genericRow.firstElementChild), true);
+    await assertClientModelRows(source, 'generic');
+    assert.doesNotMatch(await source.locator('.rt-activity').textContent(), /Sub-agent|子代理|private-unknown|Anthropic Workspace|Request identity unavailable/);
+    assert.match(await h.frame.locator('.rt-what').innerText(), /Anthropic Workspace/);
+    assert.equal(await h.frame.locator('.rt-accts > li').count(), 2);
+    assert.equal(await h.frame.locator('.rt-accts .ic').first().getAttribute('data-icon'), 'claude-color');
+    await noOverflow(service, 'generic client/model-only child'); noErrors(h);
   });
 
   await t.test('outbound, successful reply and replay return to the exact recorded source', async t => {

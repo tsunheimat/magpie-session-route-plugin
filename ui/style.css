@@ -2,7 +2,7 @@
    upstream/plugins/routing/routing.css:71-107,109. Keep vendor CSS unchanged;
    these children never participate in destination layout or wire ownership. */
 .rt-src > .rt-activity { width: 100%; min-width: 0; margin-top: 5px; color: var(--muted); font-size: 12px; text-align: start; }
-.rt-activity > summary { display: flex; align-items: center; gap: 7px; list-style: none; cursor: pointer; user-select: none; }
+.rt-activity > summary { display: flex; align-items: center; justify-content: flex-end; min-height: 20px; list-style: none; cursor: pointer; user-select: none; }
 .rt-activity > summary::-webkit-details-marker { display: none; }
 .rt-activity > summary .chev { display: inline-flex; color: var(--muted); transition: transform .2s; }
 .rt-activity > summary:hover .chev { color: var(--fg); }
@@ -12,11 +12,9 @@
 .rt-activity > .rt-actors { list-style: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; min-width: 0; margin: 5px 0 0; padding: 0; max-height: 180px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
 .rt-actors > .rt-actor { position: relative; min-width: 0; margin-left: calc(var(--depth, 0) * 18px); display: flex; align-items: center; flex-wrap: wrap; gap: 7px; row-gap: 4px; padding: 5px 10px; font-size: 12px; color: var(--muted); background: var(--card-2); border: 1px dashed var(--line); border-radius: 10px; transition: opacity .3s, border-color .3s, transform .5s cubic-bezier(.2, .8, .2, 1); }
 .rt-actors > .rt-actor.on { border-style: solid; border-color: var(--fg-2); color: var(--fg); }
-.rt-actor > svg { flex: none; color: var(--fg-2); }
-.rt-actor > b.rt-actor-label { font-size: inherit; font-weight: 560; color: var(--fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rt-actor > b.rt-actor-label::before { content: none; }
-.rt-actor > .rt-actor-models { display: flex; flex-wrap: wrap; gap: 7px; min-width: 0; max-width: 100%; }
+.rt-actor > .ic { flex: none; width: 14px; height: 14px; color: var(--fg-2); }
+.rt-actor > .ic img, .rt-actor > .ic svg { width: 14px; height: 14px; }
+.rt-actor > .rt-actor-models { display: flex; flex: 1; flex-wrap: wrap; gap: 7px; min-width: 0; max-width: 100%; }
 .rt-actor .mdl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rt-actor > i.rt-actor-state { margin-left: auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-style: normal; font-size: 10.5px; font-weight: 560; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--fg-2); white-space: nowrap; }
 .rt-activity > .rt-activity-overflow { display: block; margin-top: 4px; font-size: 11px; overflow-wrap: anywhere; }
 .rt-activity > .rt-activity-overflow:empty { display: none; }

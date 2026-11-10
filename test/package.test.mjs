@@ -29,7 +29,7 @@ test('packed runtime contains exact native assets, licenses and provenance but n
   assert(paths.has('docs/native-copy-provenance.md')); assert(paths.has('lib/native-routing.mjs'));
   assert(![...paths].some(p => /upstream|test-only|native-lifecycle|^test\/|^artifacts\//.test(p)));
   assert(pack.unpackedSize < 6 * 1024 * 1024);
-  assert.equal(pack.version, '0.3.2', 'native nested sub-agent release version');
+  assert.equal(pack.version, '0.3.3', 'client/model-only child-row release version');
   const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
   assert.equal(lock.version, pack.version); assert.equal(lock.packages[''].version, pack.version);
 });

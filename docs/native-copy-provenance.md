@@ -1,5 +1,11 @@
 # Native upper Routing provenance
 
+## v0.3.3 client/model-only children
+
+Version 0.3.3 keeps native depth-1 indentation and row/model styling, but removes the visible activity heading, repeated actor label and state pill. Children use the same `icon(agentOf(agent)?.icon || "generic")` client lookup as their parent rather than the routing-group `FAN` artwork. Only client artwork and model names are visible in each row. The disclosure remains a keyboard/touch-operable chevron with an accessible name; request state/counts and unknown identity are secondary tooltip/accessibility information.
+
+No provider display name is appended to child rows. A bounded `requestedModelName` projection omits a routing-provider prefix only when an observed attempt and candidate establish its exact decomposition. Reply model namespaces remain intact, and unresolved prefixes are not guessed. Original route identity and right-side provider headings are unchanged. Child labels/pills and group icons no longer claim parity; the native comparison is restricted to the intentionally retained row/model styling and indentation, with separate checks that child icons match the actual client.
+
 ## v0.3.2 nested sub-agent rows
 
 The source-local activity extension now adapts the actual pinned nested-routing-group presentation from `upstream/plugins/routing/routing.css:71–107,109`: 18px depth-1 indentation, 7px gaps, 10px corners, compact 5px/10px padding, native typography and dashed/active borders. Source-scoped selectors copy the necessary inherited list styling without importing destination layout, wires, virtualization or folding endpoints. Original `app.css`, `routing.css`, pristine snapshots and the extraction-only renderer remain unchanged.

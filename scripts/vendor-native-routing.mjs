@@ -125,7 +125,8 @@ export const SOURCE_ACTIVITY = `
       let group = groups.get(key);
       if (!group) groups.set(key, group = { active: new Set(), ended: new Set() });
       const model = concrete(r.served) ? r.served :
-        !r.evidence?.reasons?.includes("model_unavailable") && concrete(r.model) ? r.model : null;
+        !r.evidence?.reasons?.includes("model_unavailable") && concrete(r.model) ?
+          concrete(r.requestedModelName) ? r.requestedModelName : r.model : null;
       (r.done ? group.ended : group.active).add(model);
     }
     for (const [id, group] of groups) {
@@ -142,13 +143,12 @@ export const SOURCE_ACTIVITY = `
       return;
     }
     if (!a.activity) {
-      const node = el("details", "rt-activity"), summary = el("summary"),
-        label = el("span"), chev = el("span", "chev"),
+      const node = el("details", "rt-activity"), summary = el("summary"), chev = el("span", "chev"),
         list = el("ul", "rt-actors"), overflow = el("span", "rt-activity-overflow");
-      setText(label, t("Sub-agent activity"));
+      setAttr(summary, "aria-label", t("Toggle model activity"));
       chev.append(svg(CHEV, 12, 1.7));
       chev.setAttribute("aria-hidden", "true");
-      summary.append(label, chev);
+      summary.append(chev);
       setAttr(summary, "title", t("Gateway request activity only; task completion is unknown."));
       node.open = true;
       list.tabIndex = 0;
@@ -168,19 +168,19 @@ export const SOURCE_ACTIVITY = `
       list.addEventListener("scroll", activity.measure, { passive: true });
       node.addEventListener("toggle", activity.measure);
     }
-    const { list, entries, measure } = a.activity, models = actorModels(requests);
+    const { list, entries, measure } = a.activity, models = actorModels(requests), agent = requests[0].agent;
     for (const [id, e] of entries) if (!groups.has(id)) { e.node.remove(); entries.delete(id); }
     for (const [id, group] of groups) {
       let e = entries.get(id);
       if (!e) {
-        const node = el("li", "rt-actor"), label = el("b", "rt-actor-label"),
-          chips = el("span", "rt-actor-models"), state = el("i", "rt-actor-state"), fan = svg(FAN, 14, 1.5);
-        fan.setAttribute("aria-hidden", "true");
+        const node = el("li", "rt-actor"), chips = el("span", "rt-actor-models"),
+          client = icon(agentOf(agent)?.icon || "generic");
+        client.setAttribute("aria-hidden", "true");
         node.style.setProperty("--depth", 1);
-        node.append(fan, label, chips, state); list.append(node);
-        entries.set(id, e = { node, label, chips, state, models: "" });
+        node.append(client, chips); list.append(node);
+        entries.set(id, e = { node, chips, models: "" });
       }
-      const label = t(id ? "Sub-agent" : "Sub-agent activity"), names = models.get(id).map((m) => m ?? t("Unknown model"));
+      const names = models.get(id).map((m) => m ?? t("Unknown model"));
       const state = t(group.active > 1 ? "{n} requests active" : group.active ? "Request active" : "Requests ended", { n: group.active });
       const signature = JSON.stringify(names);
       if (signature !== e.models) {
@@ -191,25 +191,27 @@ export const SOURCE_ACTIVITY = `
         }));
         e.models = signature;
       }
-      setText(e.label, label); setText(e.state, state);
-      setAttr(e.node, "title", [label, names.join(", "), state,
-        t("{active} active requests; {ended} ended requests", { active: group.active, ended: group.ended })].join("\\n"));
+      const description = [agentName(agent), names.join(", "), state,
+        t("{active} active requests; {ended} ended requests", { active: group.active, ended: group.ended }),
+        ...(id ? [] : [t("Request identity unavailable")])].join("\\n");
+      setAttr(e.node, "title", description);
+      setAttr(e.node, "aria-label", description);
       e.node.classList.toggle("on", group.active > 0);
     }
-    setAttr(list, "aria-label", t("Sub-agent gateway requests — scroll for all activity"));
+    setAttr(list, "aria-label", t("Model request activity — scroll for all activity"));
     measure();
   }
 `;
 const ACTIVITY_TRANSLATIONS = {
   'zh-TW': {
-    'Sub-agent': '子代理',
-    'Sub-agent activity': '子代理活動',
+    'Toggle model activity': '展開或收合模型活動',
+    'Request identity unavailable': '無法識別請求來源',
     'Request active': '請求中',
     '{n} requests active': '{n} 個請求中',
     'Requests ended': '請求已結束',
     '{active} active requests; {ended} ended requests': '{active} 個請求中；{ended} 個請求已結束',
     'Gateway request activity only; task completion is unknown.': '僅表示閘道請求活動；無法判定任務是否完成。',
-    'Sub-agent gateway requests — scroll for all activity': '子代理閘道請求 — 捲動以查看所有活動',
+    'Model request activity — scroll for all activity': '模型請求活動 — 捲動以查看所有活動',
     '{n} activity entries outside view; scroll to view all': '{n} 個活動項目未顯示；捲動以查看全部',
   },
 }; // Other locales intentionally use the native English-message fallback.
@@ -355,7 +357,7 @@ export function generate({ upstream, check=false }={}) {
       {location:'account labels and tooltips', difference:'Stable opaque backend handles and neutral names replace raw account identities; mask only hides these neutral labels. External live quota windows are not read.'},
       {location:'group / provider headings', difference:'Recorded safe provider names and bundled icon/preset metadata retain native precedence; unavailable or unsupported metadata uses neutral/generic fallback. Private group/account identities remain opaque and settings navigation is removed, not stubbed.'},
       {location:'source names / model subtitles', difference:'Pinned built-in client labels/icons replace installed-client inventory. A separately disclosed project basename precedes the short session, including a single project; model and full session remain in the tooltip. No folder-to-project inference. Full folder metadata is separately opt-in.'},
-      {location:'source child activity / ui/style.css', difference:'Source-local child rows copy the pinned native nested-group presentation (routing.css lines 71-107), with depth-1 indentation, concrete observed models and request-only states. Opaque actor keys remain internal: no displayed IDs or numbering; one unknown-actor activity aggregate. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. A list-wide disclosure and keyboard/touch scroll expose all retained entries; no added actor cap. Only this scoped extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English.'},
+      {location:'source child activity / ui/style.css', difference:'Source-local child rows adapt pinned native nested-group spacing/borders (routing.css lines 71-107), with depth-1 indentation, the actual client icon and concrete observed model names only. No visible section/actor label, provider display name, state pill, ID or numbering. Verified requested-provider prefixes use requestedModelName; model namespaces stay intact. Request state/counts and unknown-identity evidence remain in tooltips/accessibility text. Opaque actor keys stay internal; one unknown-actor activity aggregate. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. A list-wide disclosure and keyboard/touch scroll expose all retained entries; no added actor cap. Only this scoped extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English.'},
       {location:'gateway subtitle / clock', difference:'Collected process identity is shown without a gateway URL; missing source clock blocks live playback. Group clock configuration is unavailable.'},
       {location:'quota / formatting helpers', difference:'Recorded quota fields remain; provider-supplied display text, live windows, expiry inventory, currency preferences and exchange rates are not fetched. Native default number/USD formatting remains.'},
       {location:'transport / lifecycle', difference:'Authenticated bounded whole snapshots replace core polling; collector live status is not process ownership. Hidden/aborted/revoked and generation reset paths clear or pause native playback.'},

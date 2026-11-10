@@ -1,11 +1,11 @@
 {
   "revision": "3f53fa1f316330b77e5ff6d065a7a56980cafda2",
   "generator": "scripts/vendor-native-routing.mjs",
-  "generatorSha256": "daf33229d4bb56af67ad2073e8fd83f9c24cf94dd1eb73308e92c775c05a2a45",
+  "generatorSha256": "7067f91a4894cd422975c5e46dc9bf215183cb2f45379d91af6589f308df0655",
   "lifecycle": "ui/native-lifecycle.inc.js",
   "lifecycleSha256": "acf0b646179d916bbf8e758c8f82321f678c9dbd9c70c13fbdd094f42f697f18",
   "baselineSha256": "1dc45c97e12665fe03fa3fe56e8fc63ad3feb2e305526d626d12526d40564383",
-  "sessionSha256": "a963dc6ed40e323bbf4458ff041d7c187f9ee098f8ceadcd818402588deb3ad5",
+  "sessionSha256": "b6ecea88f63154ecf0bcde11bcf586eda10d0c82d60e30fe32f7813581d9f439",
   "sessionPatch": "source-grouping-patch.json",
   "sourceRanges": [
     [
@@ -160,7 +160,7 @@
     },
     {
       "location": "source child activity / ui/style.css",
-      "difference": "Source-local child rows copy the pinned native nested-group presentation (routing.css lines 71-107), with depth-1 indentation, concrete observed models and request-only states. Opaque actor keys remain internal: no displayed IDs or numbering; one unknown-actor activity aggregate. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. A list-wide disclosure and keyboard/touch scroll expose all retained entries; no added actor cap. Only this scoped extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English."
+      "difference": "Source-local child rows adapt pinned native nested-group spacing/borders (routing.css lines 71-107), with depth-1 indentation, the actual client icon and concrete observed model names only. No visible section/actor label, provider display name, state pill, ID or numbering. Verified requested-provider prefixes use requestedModelName; model namespaces stay intact. Request state/counts and unknown-identity evidence remain in tooltips/accessibility text. Opaque actor keys stay internal; one unknown-actor activity aggregate. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. A list-wide disclosure and keyboard/touch scroll expose all retained entries; no added actor cap. Only this scoped extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English."
     },
     {
       "location": "gateway subtitle / clock",

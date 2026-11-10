@@ -36,6 +36,7 @@
           !measurements(r,['status','ms','tokens','out','ttft','cost']) ||
           (r.evidence != null && (!object(r.evidence) || !Array.isArray(r.evidence.reasons) || r.evidence.reasons.some(k=>!text(k,128)))) ||
           (r.session != null && !text(r.session)) ||
+          (r.requestedModelName != null && (!text(r.requestedModelName, 256) || !r.requestedModelName || r.requestedModelName.startsWith('group/'))) ||
           (r.projectName != null && !projectName(r.projectName)) || (r.actorId != null && !actorId(r.actorId)) ||
           (r.isSubagent != null && typeof r.isSubagent !== 'boolean') ||
           !Array.isArray(r.order) || !Array.isArray(r.tries) || !Array.isArray(r.left) ||
