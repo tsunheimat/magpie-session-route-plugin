@@ -1,5 +1,9 @@
 # Native upper Routing provenance
 
+## v0.3.5 source-column width adjustment
+
+The plugin-owned `ui/style.css` gives the source column about 260px on wide stages so ordinary child model names have more space. Its minimum shrinks toward 124px when the actual stage is constrained, and the native `.max560` mobile layout is unchanged. The hub track definition, gaps, destination rules, child fonts/indentation and long-name ellipsis/tooltips are retained. Existing native rectangle measurement and resize observers reposition wires; no renderer or generated source change is needed. This intentionally changes source-column geometry, not a claim of pixel-identical native layout. Copied vendor CSS remains byte-identical. This adjustment is not included in the published v0.3.4 tag.
+
 ## v0.3.4 project labels and visible children
 
 Project-present source subtitles now display only the recorded project basename(s), without the short session suffix. The original exact-session key, full-session tooltip and no-project fallback remain unchanged. Child activity uses a plain source-local container and scrollable list instead of `details`/`summary`: relevant children always show, with no chevron, toggle listener or fold state. The list retains keyboard focus, touch scrolling, overflow disclosure and request-activity metadata; no child evidence means no wrapper or residual child spacing. Native destination folding and flight algorithms are untouched.

@@ -2,7 +2,7 @@
 
 A read-only plugin page that copies Magpie's **native upper Routing block**, changing client/source grouping to the exact **agent + recorded native session ID**. Different sessions of the same client have separate source nodes; concurrent requests in one session share one source and keep independent native flights. Right-hand account/provider/model rows remain shared. The original **Routing** page and **Routing Groups** editor are not replaced.
 
-**v0.3.4 — clean project labels and always-visible children.** Project labels no longer append a session ID; full session identity remains in the tooltip and exact internal grouping. Observed child rows are always shown without an expand/collapse switch, retaining bounded keyboard/touch scrolling and client-icon/model-only content. Sources without project metadata keep the existing session/model fallback. Right-side provider branding, destination folding and original session-level flights remain unchanged. Custom uploaded provider artwork remains unsupported. See [validation](docs/validation.md) for version-specific evidence and remaining boundaries.
+**v0.3.5 — wider session source column.** The left/source column now has approximately 260px on wide stages, giving sub-agent model names more room. It shrinks with the actual available width and preserves the native mobile layout. Very long names retain ellipsis and full tooltips. Clean project labels, always-visible client-icon/model children, exact session grouping, right-side destination folding and original request flights are preserved. Custom uploaded provider artwork remains unsupported. See [validation](docs/validation.md) for version-specific evidence and remaining boundaries.
 
 The service runs **inside Magpie’s existing Bun plugin host**, listening only on `127.0.0.1`. No extra daemon/container, model calls, routing middleware or persistent traffic archive is added. The browser reaches it through Magpie’s authenticated plugin-page service proxy—not the browser’s localhost.
 
@@ -14,12 +14,12 @@ The package is named `magpie-session-routing` and is distributed through GitHub;
 
 ## Install in an existing Magpie installation
 
-The commands in this section select **v0.3.4**, including clean project labels, always-visible client/model-only child rows and the earlier project/provider display corrections. Use the local-directory method below to test a local checkout.
+The commands in this section select **v0.3.5**, including the wider source column, clean project labels, always-visible client/model-only child rows and the earlier project/provider display corrections. Use the local-directory method below to test a local checkout.
 
 Run under the same account and configuration environment as Magpie:
 
 ```sh
-magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.4
+magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.5
 magpie plugin list
 ```
 
@@ -29,14 +29,14 @@ Run the CLI inside the **existing Magpie container**, not on the Kubernetes host
 
 ```sh
 kubectl exec -n <namespace> <magpie-pod> -c <magpie-container> -- \
-  magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.4
+  magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.5
 ```
 
 The official image keeps configuration and installed plugins under `/config`; persist that mount with your existing PVC. Leave the container's HOME/XDG environment unchanged. No extra pod, Service, Ingress rule, or exposed plugin port is needed. Refresh the WebUI after installation; a pod restart should normally be unnecessary. Then complete secure first-use setup below. This is a single-instance plugin, not a cross-replica collector.
 
-### Upgrade from v0.1.0 through v0.3.3
+### Upgrade from v0.1.0 through v0.3.4
 
-Run the same `magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.4` command inside the existing Magpie container. These versions use the same package name `magpie-session-routing`, so Magpie replaces the existing entry and preserves its options and enabled/disabled state. **Do not remove the old entry first**—removal deletes its saved options. Close/reopen Session Routing after the upgrade; previously configured secure access is reused.
+Run the same `magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.5` command inside the existing Magpie container. These versions use the same package name `magpie-session-routing`, so Magpie replaces the existing entry and preserves its options and enabled/disabled state. **Do not remove the old entry first**—removal deletes its saved options. Close/reopen Session Routing after the upgrade; previously configured secure access is reused.
 
 `magpie plugin update` alone reinstalls a Git plugin's existing pinned spec; it does not change an earlier pin such as `#v0.3.2` to the new tag. If you previously installed from a local directory or have multiple entries, inspect `magpie plugin list` and use the appropriate installation path rather than creating another enabled instance.
 
