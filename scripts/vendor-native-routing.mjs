@@ -116,17 +116,56 @@ export const SOURCE_ACTIVITY = `
     }
     return groups;
   }
+  function requestModel(r) {
+    const concrete = (value) => typeof value === "string" && value.length && !value.startsWith("group/");
+    return concrete(r.served) ? r.served :
+      !r.evidence?.reasons?.includes("model_unavailable") && concrete(r.model) ?
+        concrete(r.requestedModelName) ? r.requestedModelName : r.model : null;
+  }
+  function mainModels(key, map = routes) {
+    // Trace has no affirmative main marker: exclude observed actors and auxiliary calls.
+    const eligible = [...map.values()].filter((r) => sourceKey(r) === key &&
+      !r.isSubagent && !r.actorId && !r.kind).sort((a, b) => a.id - b.id);
+    const active = eligible.filter((r) => !r.done);
+    const models = new Set((active.length ? active : eligible.slice(-1)).map(requestModel));
+    return [...models].filter((m) => m !== null).sort().concat(models.has(null) ? [null] : []);
+  }
+  function sourcePresentation(a, key, staged, map = routes, clock = Date.now() + skew) {
+    const relevant = sourceRequests(key, staged, map, clock);
+    const r = relevant.at(-1) || staged.filter((r) => sourceKey(r) === key).at(-1);
+    if (!r) return;
+    const fs = foldersOf(relevant);
+    // Project disclosure is independent of full-folder disclosure. Never infer it from folder.
+    const projects = [...new Set(relevant.map((x) => x.projectName).filter(Boolean))];
+    const names = mainModels(key, map).map((m) => m ?? t("Unknown model"));
+    if (!a.label) {
+      a.label = el("span", "rt-source-label");
+      a.models = el("span", "rt-main-models");
+      a.sub.append(a.label, a.models);
+    }
+    setText(a.label, projects.length ? projects.map(lastLevel).join(", ") : sourceLabel(r));
+    const signature = JSON.stringify(names);
+    if (signature !== a.modelNames) {
+      a.models.replaceChildren(...names.map((name) => {
+        const chip = el("code", "rt-main-model");
+        setText(chip, name); setAttr(chip, "title", name);
+        return chip;
+      }));
+      a.modelNames = signature;
+    }
+    const tip = [agentName(r.agent), ...names,
+      r.session ? t("Session id") + ": " + r.session : sourceLabel(r),
+      ...projects, ...fs.map((f) => t("Folder") + ": " + f)].join("\\n");
+    setAttr(a.node, "title", tip);
+  }
   function actorModels(requests) {
     const groups = new Map(), models = new Map();
-    const concrete = (value) => typeof value === "string" && value.length && !value.startsWith("group/");
     for (const r of requests) {
       if (!r.isSubagent && !r.actorId) continue;
       const key = r.actorId || null;
       let group = groups.get(key);
       if (!group) groups.set(key, group = { active: new Set(), ended: new Set() });
-      const model = concrete(r.served) ? r.served :
-        !r.evidence?.reasons?.includes("model_unavailable") && concrete(r.model) ?
-          concrete(r.requestedModelName) ? r.requestedModelName : r.model : null;
+      const model = requestModel(r);
       (r.done ? group.ended : group.active).add(model);
     }
     for (const [id, group] of groups) {
@@ -230,11 +269,11 @@ export function sessionPatch(s) {
   p('filter((x) => x.agent === id &&', 'filter((x) => sourceKey(x) === id &&');
   p('...rs.filter((x) => x.agent === id)', '...rs.filter((x) => sourceKey(x) === id)');
   p('const n = now(), going = pinned ? [] : [...src().values()].filter((x) => sourceKey(x) === id && (!x.done || at(x.time) + (x.ms || 0) > n - LINGER));\n      const fs = foldersOf([...new Set([...going, ...rs.filter((x) => sourceKey(x) === id)])].sort((x, y) => x.id - y.id));',
-    'const relevant = sourceRequests(id, rs), fs = foldersOf(relevant);\n      // Project disclosure is independent of full-folder disclosure. Never infer it from folder.\n      const projects = [...new Set(relevant.map((x) => x.projectName).filter(Boolean))];');
-  p('setText(a.sub, fs.length > 1 ? fs.map(lastLevel).join(", ") : r.model);', 'setText(a.sub, projects.length ? projects.map(lastLevel).join(", ") : sourceLabel(r) + " · " + r.model);');
-  p('const tip = [agentName(id), r.model, ...fs.map((f) => t("Folder") + ": " + f)].join("\\n");', 'const tip = [agentName(r.agent), r.model, r.session ? t("Session id") + ": " + r.session : sourceLabel(r), ...projects, ...fs.map((f) => t("Folder") + ": " + f)].join("\\n");');
+    'sourcePresentation(a, id, rs);');
+  p('setText(a.sub, fs.length > 1 ? fs.map(lastLevel).join(", ") : r.model);', '');
+  p('const tip = [agentName(id), r.model, ...fs.map((f) => t("Folder") + ": " + f)].join("\\n");\n      if (a.node.title !== tip) a.node.title = tip;', '');
   p('function agentNode(id, actualAgent = id) {', SOURCE_ACTIVITY + '\n  function agentNode(id, actualAgent = id) {');
-  p('const n = now(), rs = staged();', 'const n = now(), rs = staged();\n    // Activity reads retained gateway truth, never the synthetic replay clock/status.\n    for (const [key, a] of agents) sourceActivity(a, sourceRequests(key, rs, routes, Date.now() + skew));');
+  p('const n = now(), rs = staged();', 'const n = now(), rs = staged();\n    // Source models and activity read retained truth, never synthetic replay status.\n    for (const [key, a] of agents) {\n      sourcePresentation(a, key, rs);\n      sourceActivity(a, sourceRequests(key, rs, routes, Date.now() + skew));\n    }');
   p('header(cur, ags.length);', 'header(cur, actualAgents.length);');
   p('agents.size <= 1', 'new Set(rs.map((r) => r.agent)).size <= 1');
   p('agents.size > 1', 'new Set(rs.map((r) => r.agent)).size > 1');
@@ -348,7 +387,7 @@ export function generate({ upstream, check=false }={}) {
       {location:'duration / outcome / statistics', difference:'Missing measurements and outcomes say unavailable; missing totals use an em dash rather than invented zero.'},
       {location:'account labels and tooltips', difference:'Stable opaque backend handles and neutral names replace raw account identities; mask only hides these neutral labels. External live quota windows are not read.'},
       {location:'group / provider headings', difference:'Recorded safe provider names and bundled icon/preset metadata retain native precedence; unavailable or unsupported metadata uses neutral/generic fallback. Private group/account identities remain opaque and settings navigation is removed, not stubbed.'},
-      {location:'source names / model subtitles', difference:'Pinned built-in client labels/icons replace installed-client inventory. A separately disclosed project basename is shown without an adjacent session ID, including a single project; model and full session remain in the tooltip. Without disclosed project metadata the existing session/model fallback remains. No folder-to-project inference. Full folder metadata is separately opt-in.'},
+      {location:'source names / model subtitles', difference:'Pinned built-in client labels/icons replace installed-client inventory; source-only CSS places the client name beside its icon. Disclosed project basenames appear without session IDs, followed by concrete observed main-session models. Model items move to the next line when necessary and overlong names wrap; full session and selected models remain in the tooltip. Main candidates exclude recorded actors and auxiliary kinds: active distinct models, otherwise latest eligible retained request, never a child-model fallback. Missing eligible evidence omits the model; unknown eligible models stay unknown. Retained main evidence outlives activity linger but not eviction/reset and is independent of replay. Trace has no affirmative main marker; unmarked helpers remain ambiguous. Without project metadata the short-session/unknown-source identity fallback remains. No folder-to-project inference. Full folder metadata is separately opt-in.'},
       {location:'source child activity / ui/style.css', difference:'Source-local child rows adapt pinned native nested-group spacing/borders (routing.css lines 71-107), with depth-1 indentation, the actual client icon and concrete observed model names only. No visible section/actor label, provider display name, state pill, ID or numbering. Verified requested-provider prefixes use requestedModelName; model namespaces stay intact. Request state/counts and unknown-identity evidence remain in tooltips/accessibility text. Opaque actor keys stay internal; one unknown-actor activity aggregate. No worker ancestry, task completion claim, extra source, wire, or flight endpoint. Child lists are always visible when observed, with no disclosure control; keyboard/touch scroll exposes all retained entries with no added actor cap. No activity wrapper remains when there are no observed children. Only this scoped extension uses plugin CSS; native CSS is byte-identical. New messages translate zh-TW and otherwise fall back to English.'},
       {location:'gateway subtitle / clock', difference:'Collected process identity is shown without a gateway URL; missing source clock blocks live playback. Group clock configuration is unavailable.'},
       {location:'quota / formatting helpers', difference:'Recorded quota fields remain; provider-supplied display text, live windows, expiry inventory, currency preferences and exchange rates are not fetched. Native default number/USD formatting remains.'},

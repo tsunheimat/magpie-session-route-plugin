@@ -81,7 +81,7 @@ export async function noOverflow(service, label) {
     // body. Check that inner scroller AND actual bounds, not the clipped body.
     return { viewport: innerWidth, root: document.documentElement.scrollWidth,
       view: { client: view.clientWidth, scroll: view.scrollWidth },
-      nodes: [...document.querySelectorAll('#rt,.rt-stage,.rt-src,.rt-activity,.rt-actors,.rt-actor,.rt-actor-models,.rt-actor code.mdl,.rt-hub,.rt-accts,.rt-accts>li,.rt-cap,.rt-stats,.rt-log-head,.rt-steps')]
+      nodes: [...document.querySelectorAll('#rt,.rt-stage,.rt-src,.rt-src > .rt-ic,.rt-src > b,.rt-src > small,.rt-source-label,.rt-main-model,.rt-activity,.rt-actors,.rt-actor,.rt-actor-models,.rt-actor code.mdl,.rt-hub,.rt-accts,.rt-accts>li,.rt-cap,.rt-stats,.rt-log-head,.rt-steps')]
         .filter(n => n.getBoundingClientRect().width && n.getBoundingClientRect().height)
         .map(n => ({ selector: n.className, left: n.getBoundingClientRect().left, right: n.getBoundingClientRect().right })) };
   });
@@ -368,8 +368,8 @@ await test(`${engineName}: copied native upper block through the production opaq
     const h = await contextFor(browser, harness); t.after(() => h.context.close()); const service = await readyStage(h.page, h.frame);
     const a = h.frame.locator('.rt-src[title*="Session id: alpha"]');
     const b = h.frame.locator('.rt-src[title*="Session id: bravo"]');
-    assert.equal(await a.locator(':scope > small').textContent(), 'magpie, engine');
-    assert.equal(await b.locator(':scope > small').textContent(), 'dial');
+    assert.equal(await a.locator(':scope > small > .rt-source-label').textContent(), 'magpie, engine');
+    assert.equal(await b.locator(':scope > small > .rt-source-label').textContent(), 'dial');
     assert.match(await a.getAttribute('title'), /Folder: workspace\/magpie\nFolder: src\/engine/);
     assert.doesNotMatch(await a.getAttribute('title'), /dial/);
     assert.match(await b.getAttribute('title'), /Folder: src\/dial/);
@@ -382,8 +382,8 @@ await test(`${engineName}: copied native upper block through the production opaq
     assert.equal(await service.evaluate(() => folderNodes.every(n => n.isConnected)), true);
     assert.equal(await h.frame.locator('.rt-src').count(), 2);
     assert.match(await a.getAttribute('title'), /Folder: new\/module/); assert.doesNotMatch(await b.getAttribute('title'), /module/);
-    assert.equal(await a.locator(':scope > small').textContent(), 'magpie, module');
-    assert.equal(await b.locator(':scope > small').textContent(), 'dial');
+    assert.equal(await a.locator(':scope > small > .rt-source-label').textContent(), 'magpie, module');
+    assert.equal(await b.locator(':scope > small > .rt-source-label').textContent(), 'dial');
     noErrors(h);
   });
 
@@ -434,8 +434,9 @@ await test(`${engineName}: copied native upper block through the production opaq
     const harness = await browserHarness({ fixture }); t.after(() => harness.close());
     const h = await contextFor(browser, harness); t.after(() => h.context.close());
     const service = await readyStage(h.page, h.frame);
-    const subtitles = await h.frame.locator('.rt-src > small').allTextContents();
+    const subtitles = await h.frame.locator('.rt-src > small > .rt-source-label').allTextContents();
     assert.deepEqual(subtitles, ['same-project', 'same-project']);
+    assert.deepEqual(await h.frame.locator('.rt-src > small .rt-main-model').allTextContents(), ['example-model', 'example-model']);
     assert.equal(await h.frame.locator('.rt-src').count(), 2, 'equal project names never merge recorded sessions');
     assert.deepEqual(await sourceTitles(h.frame), [
       'Claude Code\nexample-model\nSession id: alpha\nsame-project',
@@ -446,9 +447,9 @@ await test(`${engineName}: copied native upper block through the production opaq
     assert.equal(await service.evaluate(() => projectSources.every((n, i) => n === document.querySelectorAll('.rt-src')[i])), true);
     fixture.routes[0].folder = 'private-parent/renamed-project'; fixture.routes[0].parentSession = 'bravo';
     update(harness, fixture);
-    await service.waitForFunction(() => document.querySelector('.rt-src[title*="Session id: alpha"] > small')?.textContent === 'renamed-project');
+    await service.waitForFunction(() => document.querySelector('.rt-src[title*="Session id: alpha"] > small > .rt-source-label')?.textContent === 'renamed-project');
     assert.equal(await service.evaluate(() => projectSources.every((n, i) => n === document.querySelectorAll('.rt-src')[i])), true, 'project and parent changes do not rekey either source');
-    assert.deepEqual(await h.frame.locator('.rt-src > small').allTextContents(), ['renamed-project', 'same-project']);
+    assert.deepEqual(await h.frame.locator('.rt-src > small > .rt-source-label').allTextContents(), ['renamed-project', 'same-project']);
     assert.deepEqual(await sourceTitles(h.frame), [
       'Claude Code\nexample-model\nSession id: alpha\nrenamed-project',
       'Claude Code\nexample-model\nSession id: bravo\nsame-project',
@@ -462,10 +463,143 @@ await test(`${engineName}: copied native upper block through the production opaq
     const hidden = await browserHarness({ fixture, showProjectNames: false }); t.after(() => hidden.close());
     const other = await contextFor(browser, hidden); t.after(() => other.context.close());
     await readyStage(other.page, other.frame);
-    assert.deepEqual(await other.frame.locator('.rt-src > small').allTextContents(), ['alpha · example-model', 'bravo · example-model'], 'no-project session/model fallback is unchanged');
+    assert.deepEqual(await other.frame.locator('.rt-src > small > .rt-source-label').allTextContents(), ['alpha', 'bravo'], 'no-project labels retain the exact session fallback separately from models');
+    assert.deepEqual(await other.frame.locator('.rt-src > small .rt-main-model').allTextContents(), ['example-model', 'example-model']);
     assert.doesNotMatch(await other.frame.locator('#rt').innerText(), /same-project|renamed-project|private-parent/);
     assert.doesNotMatch(JSON.stringify(hidden.aggregator.nativeSnapshot()), /same-project|renamed-project|private-parent/);
     noErrors(other);
+  });
+
+  await t.test('source headers keep retained main models distinct from newer children, helpers and replay', async t => {
+    const fixture = nativeTrace({ sessions: ['header-session', 'header-session', 'header-session'] });
+    const [main, child, title] = fixture.routes;
+    fixture.now = '2026-11-09T00:00:30.000Z';
+    for (const r of fixture.routes) r.folder = 'private-parent/header-project';
+    main.model = 'org/main-model/v1'; child.sub = 'private-header-actor'; child.model = 'child-model';
+    // Keep the original request identity stable when later completing it;
+    // changing its start time would correctly trigger a generation reset.
+    main.time = '2026-11-08T23:59:00.000Z'; main.tries[0].start = main.time;
+    title.kind = 'title'; title.model = 'title-model'; title.done = true; title.status = 200; title.ms = 16000;
+    // Several recorded attempts make a long real replay without replacing the
+    // native clock or scheduler, leaving time for the authenticated poll.
+    title.tries = Array.from({ length: 8 }, (_, i) => ({ ...title.tries[0],
+      start: new Date(Date.parse(title.time) + i * 2000).toISOString(), done: true, ms: 2000,
+      status: i === 7 ? 200 : 503, ...(i < 7 ? { again: 1, fail: 'overloaded' } : {}) }));
+    const harness = await browserHarness({ fixture }); t.after(() => harness.close());
+    const h = await contextFor(browser, harness, { width: 1280, height: 1000 }, 'no-preference');
+    t.after(() => h.context.close()); const service = await readyStage(h.page, h.frame);
+    const source = h.frame.locator('.rt-src[title*="Session id: header-session"]');
+    const models = source.locator(':scope > small .rt-main-model');
+    assert.deepEqual(await models.allTextContents(), ['org/main-model/v1']);
+    assert.deepEqual(await source.locator('.rt-actor code.mdl').allTextContents(), ['child-model']);
+    assert.equal(await source.locator('.rt-source-label').textContent(), 'header-project');
+    assert.equal(await source.getAttribute('title'), 'Claude Code\norg/main-model/v1\nSession id: header-session\nheader-project');
+    assert.equal(await source.locator(':scope > small').evaluate(n => n.childNodes.length === 2 &&
+      n.firstChild.matches('span.rt-source-label') && n.lastChild.matches('span.rt-main-models') &&
+      [...n.lastChild.children].every(c => c.matches('code.rt-main-model:not(.mdl)'))), true);
+    await assertClientModelRows(source, 'claudecode-color');
+    await service.evaluate(() => { window.headerParts = [...document.querySelectorAll('.rt-src,.rt-src > .rt-ic,.rt-src > b,.rt-src > small,.rt-source-label,.rt-main-models,.rt-main-model,.rt-actor,.rt-actor code.mdl')]; });
+    const before = reads(harness); await waitUntil(() => reads(harness) >= before + 3, 'unchanged header polls complete');
+    assert.equal(await service.evaluate(() => headerParts.every(n => n.isConnected)), true);
+    const generation = harness.aggregator.generation;
+    main.done = true; main.status = 200; main.ms = 100;
+    Object.assign(main.tries[0], { start: main.time, done: true, status: 200, ms: 100 });
+    update(harness, fixture);
+    const retainedPolls = reads(harness); await waitUntil(() => reads(harness) >= retainedPolls + 2, 'old completed main is accepted');
+    assert.equal(harness.aggregator.generation, generation, 'ordinary completion preserves the request generation');
+    assert.deepEqual(await models.allTextContents(), ['org/main-model/v1'], 'retention, not the activity linger window, controls the completed main model');
+    assert.equal(await source.locator('.rt-actor.on').count(), 1, 'child remains active after its main request ends');
+    assert.equal(await service.evaluate(() => headerParts.every(n => n.isConnected)), true, 'completion retains source, label, model and child nodes');
+
+    await h.frame.getByRole('button', { name: 'Replay', exact: true }).click();
+    await h.frame.locator('.rt-replay .rp-req').waitFor();
+    assert.deepEqual(await models.allTextContents(), ['org/main-model/v1'], 'a title-only replay cannot replace retained main evidence');
+    await service.evaluate(() => { window.replayHeaderParts = [...document.querySelectorAll('.rt-src,.rt-source-label,.rt-main-models')]; });
+    main.served = 'org/served-main/v2'; update(harness, fixture);
+    // Native ingest skips sync/rebuild while rp is active. The render path must
+    // still refresh from the live retained map, not the replay request clones.
+    await service.waitForFunction(() => document.querySelector('.rt-src .rt-main-model')?.textContent === 'org/served-main/v2');
+    assert.equal(await h.frame.locator('.rt-replay').isVisible(), true, 'model refresh happens during replay, not only after a rebuild on exit');
+    assert.equal(await service.evaluate(() => replayHeaderParts.every(n => n.isConnected)), true);
+    assert.match(await source.getAttribute('title'), /^Claude Code\norg\/served-main\/v2\nSession id: header-session\n/);
+    await h.frame.getByRole('button', { name: 'Stop replay', exact: true }).click();
+    await service.waitForFunction(() => document.querySelector('.rt-replay').hidden);
+    await service.evaluate(() => { window.evictionHeaderParts = [...document.querySelectorAll('.rt-src,.rt-source-label,.rt-main-models,.rt-actor,.rt-actor code.mdl')]; });
+    fixture.routes = [child, title]; fixture.ids = fixture.routes.map(r => r.id); update(harness, fixture);
+    await service.waitForFunction(() => document.querySelector('.rt-src') && !document.querySelector('.rt-src .rt-main-model'));
+    assert.equal(await source.locator('.rt-actor.on').count(), 1);
+    assert.deepEqual(await source.locator('.rt-actor code.mdl').allTextContents(), ['child-model']);
+    assert.equal(await source.getAttribute('title'), 'Claude Code\nSession id: header-session\nheader-project', 'no cached main model or newest child/title fallback survives eviction');
+    assert.equal(await service.evaluate(() => evictionHeaderParts.every(n => n.isConnected)), true);
+    await noOverflow(service, 'retained main header'); noErrors(h);
+  });
+
+  await t.test('source icon/name share a row and project/main-model items wrap naturally without clipping', async t => {
+    const fixture = nativeTrace({ sessions: ['layout-session'] }), request = fixture.routes[0];
+    request.folder = 'private-parent/demo'; request.model = 'm1';
+    const harness = await browserHarness({ fixture }); t.after(() => harness.close());
+    const h = await contextFor(browser, harness); t.after(() => h.context.close());
+    const service = await readyStage(h.page, h.frame), source = h.frame.locator('.rt-src');
+    const geometry = () => source.evaluate(n => {
+      const box = selector => {
+        const r = n.querySelector(selector).getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height, cy: r.y + r.height / 2 };
+      };
+      const chip = n.querySelector('.rt-main-model'), range = document.createRange(); range.selectNodeContents(chip);
+      return { icon: box(':scope > .rt-ic'), name: box(':scope > b'), row: box(':scope > small'),
+        label: box('.rt-source-label'), model: box('.rt-main-model'),
+        lines: [...range.getClientRects()].map(r => ({ top: r.top, bottom: r.bottom, left: r.left, right: r.right })),
+        text: chip.textContent, title: chip.title, scroll: chip.scrollWidth, client: chip.clientWidth };
+    });
+    const setModel = async model => {
+      request.model = model; update(harness, fixture);
+      await service.waitForFunction(model => document.querySelector('.rt-main-model')?.textContent === model, model);
+    };
+    const assertHeader = g => {
+      assert(g.icon.right <= g.name.left + 1 && Math.abs(g.icon.cy - g.name.cy) < 2, `icon and client name are horizontal and centered: ${JSON.stringify(g)}`);
+      assert(g.row.top >= Math.max(g.icon.bottom, g.name.bottom) - 1, 'project/model row follows the client heading');
+      assert.equal(g.text, g.title, 'the complete main model is visible, not tooltip-only');
+      assert(g.scroll <= g.client + 1 && g.lines.every(r => r.left >= g.row.left - 1 && r.right <= g.row.right + 1), `model text stays within the subtitle: ${JSON.stringify(g)}`);
+    };
+    for (const width of [1280, 390]) {
+      await h.page.setViewportSize({ width, height: 1000 });
+      await service.waitForFunction(mobile => document.querySelector('#rt').classList.contains('max560') === mobile, width === 390);
+      await setModel('m1');
+      const short = await geometry(); assertHeader(short);
+      assert(short.model.left >= short.label.right - 1 && short.model.top < short.label.bottom && short.label.top < short.model.bottom,
+        `project and a short model fit on the same line at ${width}px: ${JSON.stringify(short)}`);
+      // A model shorter than the row but wider than its remaining space moves
+      // as a whole item. Select its length from the actual font and row width.
+      const nextLineModel = await source.evaluate(n => {
+        const chip = n.querySelector('.rt-main-model'), row = n.querySelector(':scope > small'), label = n.querySelector('.rt-source-label');
+        const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d'), style = getComputedStyle(chip); ctx.font = style.font;
+        const extra = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce((sum, key) => sum + parseFloat(style[key]), 0);
+        const room = row.getBoundingClientRect().width, remainder = room - label.getBoundingClientRect().width - parseFloat(getComputedStyle(row).columnGap);
+        return Array.from({ length: 64 }, (_, i) => 'model-' + 'x'.repeat(i + 1)).find(model => {
+          const width = ctx.measureText(model).width + extra; return width > remainder + 4 && width < room - 4;
+        });
+      });
+      assert(nextLineModel, 'fixture has a model width between remaining space and full subtitle width');
+      await setModel(nextLineModel);
+      const nextLine = await geometry(); assertHeader(nextLine);
+      assert(nextLine.model.top >= nextLine.label.bottom - 1, `a complete model item moves to the next line: ${JSON.stringify(nextLine)}`);
+      assert.equal(new Set(nextLine.lines.map(r => Math.round(r.top))).size, 1, 'a model that fits the full row does not break merely to fill the project line');
+      const overlong = 'examplemodel' + 'x'.repeat(150);
+      await setModel(overlong);
+      const wrapped = await geometry(); assertHeader(wrapped);
+      assert.equal(wrapped.text, overlong);
+      assert(wrapped.model.top >= wrapped.label.bottom - 1 && new Set(wrapped.lines.map(r => Math.round(r.top))).size > 1,
+        `overlong unbroken main models wrap to multiple lines at ${width}px: ${JSON.stringify(wrapped)}`);
+      await noOverflow(service, `main model wrapping ${width}px`);
+      await capture(h.page, h.frame, `main-model-overlong-${width}`);
+      await setModel('claude-sonnet-4-5-20250929');
+      for (const dark of [false, true]) {
+        await h.page.evaluate(v => window.testTheme(v), dark);
+        await service.waitForFunction(theme => document.documentElement.dataset.theme === theme, dark ? 'dark' : 'light');
+        await capture(h.page, h.frame, `source-heading-${width}-${dark ? 'dark' : 'light'}`);
+      }
+    }
+    noErrors(h);
   });
 
   await t.test('wider source columns show ordinary child models and resize with native wires', async t => {
@@ -483,7 +617,7 @@ await test(`${engineName}: copied native upper block through the production opaq
     const alpha = h.frame.locator('.rt-src[title*="Session id: alpha"]');
     await service.waitForFunction(() => document.querySelector('.rt-actor code.mdl'));
     await assertClientModelRows(alpha, 'claudecode-color');
-    assert.deepEqual(await h.frame.locator('.rt-src > small').allTextContents(), ['project-width', 'project-width']);
+    assert.deepEqual(await h.frame.locator('.rt-src > small > .rt-source-label').allTextContents(), ['project-width', 'project-width']);
     assert.equal(await h.frame.locator('.rt-src[title*="Session id: bravo"] .rt-activity').count(), 0);
     await service.evaluate(() => { window.widthSources = [...document.querySelectorAll('.rt-src')]; });
     // Observe actual native paths after each resize, without replacing layout or
@@ -511,7 +645,7 @@ await test(`${engineName}: copied native upper block through the production opaq
       assert.equal(await service.evaluate(() => widthSources.every((n, i) => n === document.querySelectorAll('.rt-src')[i])), true);
       if (fullModel) {
         assert.equal(await alpha.evaluate(n => n.offsetWidth), 260, 'wide stage reserves model room in the source column');
-        assert.equal(await alpha.locator('code.mdl').evaluate(n => n.textContent === n.title && n.scrollWidth <= n.clientWidth), true, 'representative model is visibly complete, not just present in a tooltip');
+        assert.equal(await alpha.locator('.rt-actor code.mdl').evaluate(n => n.textContent === n.title && n.scrollWidth <= n.clientWidth), true, 'representative model is visibly complete, not just present in a tooltip');
       }
     };
     await checkLayout('wide source initial', true);

@@ -2,6 +2,18 @@
    hub sizing or gaps. Shrink the source track when the actual stage is constrained. */
 #rt:not(.max560) > .rt-stage { grid-template-columns: minmax(clamp(124px, calc(100% - 540px), 260px), 20%) fit-content(max(124px, 15%)) minmax(0, 1fr); }
 
+/* Source header only: client beside its icon, project and main models below.
+   Whole model items move to the next line before wrapping an overlong name. */
+.rt-src { flex-direction: row; flex-wrap: wrap; justify-content: center; column-gap: 6px; }
+.rt-src > .rt-ic { flex: none; display: inline-flex; }
+.rt-src > .rt-ic > .ic { margin-bottom: 0; }
+.rt-src > b { min-width: 0; max-width: calc(100% - 32px); }
+.rt-src > small { flex: 0 0 100%; min-width: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px 6px; overflow: visible; white-space: normal; }
+.rt-src .rt-source-label { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.rt-src .rt-main-models { display: contents; }
+.rt-src .rt-main-model { flex: 0 0 auto; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.rt-src > .rt-activity { flex: 0 0 100%; }
+
 /* Source-only adaptation of the pinned native nested-group rows:
    upstream/plugins/routing/routing.css:71-107,109. Keep vendor CSS unchanged;
    these children never participate in destination layout or wire ownership. */

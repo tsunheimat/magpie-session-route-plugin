@@ -2,7 +2,7 @@
 
 A read-only plugin page that copies Magpie's **native upper Routing block**, changing client/source grouping to the exact **agent + recorded native session ID**. Different sessions of the same client have separate source nodes; concurrent requests in one session share one source and keep independent native flights. Right-hand account/provider/model rows remain shared. The original **Routing** page and **Routing Groups** editor are not replaced.
 
-**v0.3.5 — wider session source column.** The left/source column now has approximately 260px on wide stages, giving sub-agent model names more room. It shrinks with the actual available width and preserves the native mobile layout. Very long names retain ellipsis and full tooltips. Clean project labels, always-visible client-icon/model children, exact session grouping, right-side destination folding and original request flights are preserved. Custom uploaded provider artwork remains unsupported. See [validation](docs/validation.md) for version-specific evidence and remaining boundaries.
+**v0.3.6 — inline client heading and main-session models.** The client name now sits to the right of its icon. Project labels are followed by observed main-session model names; models move to the next line when needed and overlong main names wrap rather than clipping. Recorded child/helper models are not substituted for missing main evidence. The wider responsive source column, always-visible client-icon/model children, exact session grouping, right-side destination folds and original request flights are preserved. Custom uploaded provider artwork remains unsupported. See [validation](docs/validation.md) for version-specific evidence and remaining boundaries.
 
 The service runs **inside Magpie’s existing Bun plugin host**, listening only on `127.0.0.1`. No extra daemon/container, model calls, routing middleware or persistent traffic archive is added. The browser reaches it through Magpie’s authenticated plugin-page service proxy—not the browser’s localhost.
 
@@ -14,12 +14,12 @@ The package is named `magpie-session-routing` and is distributed through GitHub;
 
 ## Install in an existing Magpie installation
 
-The commands in this section select **v0.3.5**, including the wider source column, clean project labels, always-visible client/model-only child rows and the earlier project/provider display corrections. Use the local-directory method below to test a local checkout.
+The commands in this section select **v0.3.6**, including inline client headings, wrapping main-session models, the wider source column, always-visible client/model-only child rows and the earlier project/provider display corrections. Use the local-directory method below to test a local checkout.
 
 Run under the same account and configuration environment as Magpie:
 
 ```sh
-magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.5
+magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.6
 magpie plugin list
 ```
 
@@ -29,14 +29,14 @@ Run the CLI inside the **existing Magpie container**, not on the Kubernetes host
 
 ```sh
 kubectl exec -n <namespace> <magpie-pod> -c <magpie-container> -- \
-  magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.5
+  magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.6
 ```
 
 The official image keeps configuration and installed plugins under `/config`; persist that mount with your existing PVC. Leave the container's HOME/XDG environment unchanged. No extra pod, Service, Ingress rule, or exposed plugin port is needed. Refresh the WebUI after installation; a pod restart should normally be unnecessary. Then complete secure first-use setup below. This is a single-instance plugin, not a cross-replica collector.
 
-### Upgrade from v0.1.0 through v0.3.4
+### Upgrade from v0.1.0 through v0.3.5
 
-Run the same `magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.5` command inside the existing Magpie container. These versions use the same package name `magpie-session-routing`, so Magpie replaces the existing entry and preserves its options and enabled/disabled state. **Do not remove the old entry first**—removal deletes its saved options. Close/reopen Session Routing after the upgrade; previously configured secure access is reused.
+Run the same `magpie plugin add github:tsunheimat/magpie-session-route-plugin#v0.3.6` command inside the existing Magpie container. These versions use the same package name `magpie-session-routing`, so Magpie replaces the existing entry and preserves its options and enabled/disabled state. **Do not remove the old entry first**—removal deletes its saved options. Close/reopen Session Routing after the upgrade; previously configured secure access is reused.
 
 `magpie plugin update` alone reinstalls a Git plugin's existing pinned spec; it does not change an earlier pin such as `#v0.3.2` to the new tag. If you previously installed from a local directory or have multiple entries, inspect `magpie plugin list` and use the appropriate installation path rather than creating another enabled instance.
 
@@ -93,8 +93,8 @@ A CLI host can receive a temporary service port from Magpie. It must not become 
 
 This is the actual copied native upper block, not a newly drawn equivalent. There is **no new session dropdown, per-request source card, custom Details drawer or six-request/twelve-destination limit**.
 
-- **Session sources:** `(agent, recorded session)` is exact and case-sensitive. Claude Code/session A and Claude Code/session B get separate native source nodes. Two requests in session A share one node but keep independent native request flights. Codex/session A remains separate from Claude Code/session A. The original client icon/name/color remain. A disclosed project name is shown without an adjacent ID; without project metadata the session/model fallback remains.
-- **Projects:** a recorded project basename appears even for a session with only one project, without the adjacent session ID. Model and full session ID remain in the native tooltip. Missing evidence is not guessed, and equal project names do not merge sessions.
+- **Session sources:** `(agent, recorded session)` is exact and case-sensitive. Claude Code/session A and Claude Code/session B get separate native source nodes. Two requests in session A share one node but keep independent native request flights. Codex/session A remains separate from Claude Code/session A. The original client icon/name/color remain, with the name beside the icon. A disclosed project name is shown without an adjacent ID; without project metadata the short-session/unknown-source identity label remains.
+- **Projects and main models:** a recorded project basename appears even for a session with only one project, followed by concrete observed main-session model names. Models share the line when they fit, otherwise move below; overlong main names wrap instead of clipping. Active main requests supply distinct models, otherwise the latest eligible retained main request supplies its model. Recorded actors and auxiliary kinds are excluded, even if their requests are newer. No eligible main means no main-model item; an eligible request with missing model shows unknown. Trace lacks an affirmative main marker, so unmarked helpers remain ambiguous. Full session identity and selected models remain in the tooltip; equal project names never merge sessions.
 - **Sub-agent activity:** indented native nested-group-style rows sit inside their recorded session. Each row shows only its actual client icon and concrete observed model name(s), with no visible “Sub-agent” text, activity heading, provider name or request-state pill. State/counts remain in the tooltip and accessibility text; no actor IDs or substitute numbers appear. Repeated requests by one actor share its row, even across models; different actors remain distinct even when their models match. Models come from active requests, or retained ended requests if none are active. Kind-only or conflicting identity evidence stays one aggregate with unknown identity disclosed in its tooltip/accessibility text, not an invented worker count. The list is always visible when child activity is present and scrolls without an additional actor cap beyond the retained trace; there is no show/hide switch. This is a one-level session subdivision, not a recursive agent tree: trace does not expose a complete parent-agent chain, and `parentSession` is title-helper metadata. Flights still use the session's native source wire/origin; independent recorded sessions remain separate. “Requests ended” never means the worker's whole task finished.
 - **Identity boundaries:** model/provider/folder changes do not split a known session; parent/child metadata does not merge recorded sessions. Missing or invalid session identities are labelled unknown and isolated per stable request, never assigned to a known session. This page cannot recover a header that Magpie already overrode or truncated.
 - **Destinations:** the original account/provider/model rows, reconciliation, folds and wires are retained. Safe account handles are shared across requests and sessions, so the same observed seat stays one native destination rather than becoming a new row per request.

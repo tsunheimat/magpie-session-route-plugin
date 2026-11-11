@@ -2,6 +2,30 @@
 
 This record distinguishes **implemented**, **automatically tested**, and **deployment-verified** behavior. A loopback/protocol fixture is not a Docker, external HTTPS or production agent-process test. Generated artifacts are excluded from the npm package.
 
+## v0.3.6 source heading and main model — 2026-11-11
+
+The user requested the client name beside its icon and the main-session model next to the project, with complete-name wrapping when necessary. On `fix/source-heading-main-model`, source-only CSS changes header/subtitle layout, while the authored source patch derives main models from exact-source retained live requests excluding observed actors and nonempty auxiliary kinds. Distinct active main models take precedence, otherwise the latest eligible retained request supplies its model beyond activity linger; eviction/reset still removes evidence. Missing main evidence never borrows a child/title model. Unknown eligible models remain distinct from absent main evidence. Trace has no affirmative main-identity field, so unmarked helpers remain ambiguous.
+
+Project disclosure, full-session tooltip identity, responsive source width, always-visible children, native destinations and flights are retained. Main model names wrap; child-model ellipsis stays unchanged. After reviewing the completed correction, the user explicitly requested commit, merge, push and release. Version 0.3.6 targets GitHub source/tag/release distribution, not npm or a cluster deployment; earlier tags remain unchanged. Candidate evidence is under `artifacts/native-routing/source-heading-checks-YbfHfQ/`; release checks are under `artifacts/release-v0.3.6-2wahOz/`.
+
+Release runtime fingerprint: **`ee43887dd26b5f7efe44f80ef1c55ed0937d16d960e2c7e736ec32c7ea5cdd0a`**, using the 222-file method below. Browser evidence was captured on candidate `20f164878a936d8a0167be3304821a371cd4f02fe253df4b000352431abc0d0d`; the package version is the only runtime-hashed change afterward. The deterministic source patch remains 28 replacements; backend, copied CSS, pristine source and extraction-only baseline remain unchanged. Archive/tag installation and commit-specific CI evidence are recorded separately in the release notes.
+
+Release regression checks:
+- Unit/API: **192 passed, 1 browser-only skip**, `artifacts/release-v0.3.6-2wahOz/unit.log`; the skipped fixture ran separately in both engines below.
+- Syntax/provenance/package: **46 scripts, 229 package files, below 6 MiB**, `artifacts/release-v0.3.6-2wahOz/check.log`.
+- Contained actual Magpie/Bun: **14/14 passed** for 0.3.6, `artifacts/integration/run-eVnsrL/result.json`, completed `2026-11-11T09:43:32.059Z`, reference unchanged. Synthetic state/processes are cleaned and external egress is blocked. These existing host/API scenarios are separate from browser header/model verification; no production-agent, Docker/Ingress/Authentik HTTPS or live-cluster certification is claimed.
+
+Final browser verification, run sequentially:
+- Chromium protected service: **24/24 passed**, `chromium-service-fixed.log`.
+- Isolated WebKit protected service: **24/24 passed**, `webkit-service.log`.
+- Chromium and isolated WebKit original/native comparisons: **21/21 passed each**, `{chromium,webkit}-native.log`; captures and comparison reports are under `artifacts/native-routing/source-heading-native-rows/`.
+
+The suites exercise horizontal icon/name alignment, same-line project/model fitting, whole-model next-line movement, unbroken overlong wrapping, direct/child/title model separation, completed-main retention beyond linger, live served-model refresh during replay without rebuild, eviction without child fallback, stable DOM/focus/scroll, native width boundaries and exact source return flights. Original-to-extraction comparison remains exact; the changed source header is separately recorded as intentional.
+
+Actual service desktop-light/mobile-dark screenshots were inspected in both engines, plus Chromium overlong mobile and desktop child-list captures and WebKit native-reference nested rows. Ordinary names fit or move below the project; an overlong name remains complete across several lines. Existing native nested children/destination folds remain intact, without horizontal page overflow. Selected captures: [desktop with children](../artifacts/native-routing/source-heading-checks-YbfHfQ/desktop-light.png), [mobile wrapping](../artifacts/native-routing/source-heading-checks-YbfHfQ/mobile-dark.png), [WebKit desktop](../artifacts/native-routing/source-heading-checks-YbfHfQ/webkit-desktop-light.png), [WebKit mobile](../artifacts/native-routing/source-heading-checks-YbfHfQ/webkit-mobile-dark.png).
+
+The first Chromium run caught a test-fixture identity error: completing the retained main also rewrote its start time, correctly triggering the existing generation-reset protection and invalidating stored DOM references. The fixture now has its old start time from initialization and completes without changing identity, with an additional unchanged-generation assertion. Node-preservation checks and runtime behavior were not weakened. The original failed result is retained in `chromium-service.log`.
+
 ## v0.3.5 wider source column — 2026-11-11
 
 The user requested more left-column space for child model names after v0.3.4. On `fix/wider-session-source`, the only runtime change is a plugin-owned CSS grid-track override: approximately 260px on wide stages, shrinking with the actual stage width and yielding to the existing native `.max560` mobile layout. Native hub sizing/gaps, child typography/indentation, ellipsis/full tooltips, source identity, always-visible children, destination folding and wire algorithms are unchanged. After reviewing the completed correction, the user explicitly requested commit, merge, push and release. Version 0.3.5 targets GitHub source/tag/release distribution, not npm or a cluster deployment; earlier tags remain unchanged.
