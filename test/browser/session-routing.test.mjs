@@ -468,6 +468,95 @@ await test(`${engineName}: copied native upper block through the production opaq
     noErrors(other);
   });
 
+  await t.test('wider source columns show ordinary child models and resize with native wires', async t => {
+    const model = 'claude-sonnet-4-5-20250929';
+    const fixture = nativeTrace({ sessions: ['alpha', 'alpha', 'bravo'] });
+    for (const r of fixture.routes) {
+      r.model = model; r.folder = 'private-parent/project-width';
+      for (const seat of r.order) seat.model = model;
+      for (const attempt of r.tries) attempt.model = model;
+    }
+    fixture.routes[1].sub = 'private-width-actor';
+    const harness = await browserHarness({ fixture }); t.after(() => harness.close());
+    const h = await contextFor(browser, harness, { width: 1280, height: 1000 }, 'no-preference', observeNative);
+    t.after(() => h.context.close()); const service = await readyStage(h.page, h.frame);
+    const alpha = h.frame.locator('.rt-src[title*="Session id: alpha"]');
+    await service.waitForFunction(() => document.querySelector('.rt-actor code.mdl'));
+    await assertClientModelRows(alpha, 'claudecode-color');
+    assert.deepEqual(await h.frame.locator('.rt-src > small').allTextContents(), ['project-width', 'project-width']);
+    assert.equal(await h.frame.locator('.rt-src[title*="Session id: bravo"] .rt-activity').count(), 0);
+    await service.evaluate(() => { window.widthSources = [...document.querySelectorAll('.rt-src')]; });
+    // Observe actual native paths after each resize, without replacing layout or
+    // assuming the six path-length pixels used by packets are horizontal.
+    const settledWires = () => service.evaluate(() => {
+      const box = n => {
+        const b = n.getBoundingClientRect(), m = new DOMMatrix(getComputedStyle(n).transform);
+        const width = b.width / Math.hypot(m.a, m.b);
+        return { left: b.x + (b.width - width) / 2, right: b.x + (b.width + width) / 2, cy: b.y + b.height / 2 };
+      };
+      const hub = box(document.querySelector('.rt-hub'));
+      const paths = [...document.querySelectorAll('.rt-wires path')].filter(p => p.getAttribute('d')).map(p => {
+        const m = p.getScreenCTM(), first = p.getPointAtLength(0), last = p.getPointAtLength(p.getTotalLength());
+        return { first: new DOMPoint(first.x, first.y).matrixTransform(m), last: new DOMPoint(last.x, last.y).matrixTransform(m) };
+      });
+      return [...document.querySelectorAll('.rt-src')].every(n => {
+        const s = box(n);
+        return paths.some(p => Math.hypot(p.first.x - s.right, p.first.y - s.cy) < 1 &&
+          Math.hypot(p.last.x - hub.left, p.last.y - hub.cy) < 1);
+      });
+    });
+    const checkLayout = async (label, fullModel = false) => {
+      await waitUntil(settledWires, `${label}: native source wires follow the resized cards`);
+      await noOverflow(service, label);
+      assert.equal(await service.evaluate(() => widthSources.every((n, i) => n === document.querySelectorAll('.rt-src')[i])), true);
+      if (fullModel) {
+        assert.equal(await alpha.evaluate(n => n.offsetWidth), 260, 'wide stage reserves model room in the source column');
+        assert.equal(await alpha.locator('code.mdl').evaluate(n => n.textContent === n.title && n.scrollWidth <= n.clientWidth), true, 'representative model is visibly complete, not just present in a tooltip');
+      }
+    };
+    await checkLayout('wide source initial', true);
+    for (const contentWidth of [803, 804, 805, 700, 561, 560, 559]) {
+      await service.evaluate(width => {
+        const rt = document.querySelector('#rt'), s = getComputedStyle(rt);
+        const extra = s.boxSizing === 'border-box' ? parseFloat(s.paddingLeft) + parseFloat(s.paddingRight) + parseFloat(s.borderLeftWidth) + parseFloat(s.borderRightWidth) : 0;
+        rt.style.width = `${width + extra}px`;
+      }, contentWidth);
+      await service.waitForFunction(narrow => document.querySelector('#rt').classList.contains('max560') === narrow, contentWidth <= 560);
+      await checkLayout(`constrained routing content ${contentWidth}px`);
+      if (contentWidth > 560) {
+        const sizes = await service.evaluate(() => {
+          const stage = document.querySelector('.rt-stage'), s = getComputedStyle(stage);
+          return { available: stage.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight), source: document.querySelector('.rt-src').offsetWidth };
+        });
+        const expected = Math.max(Math.min(260, Math.max(124, sizes.available - 540)), sizes.available * .2);
+        assert(Math.abs(sizes.source - expected) < 1, `source track adapts to stage, not viewport: ${JSON.stringify(sizes)}`);
+      }
+    }
+    await service.evaluate(() => document.querySelector('#rt').style.removeProperty('width'));
+    for (const width of [390, 900, 1280]) {
+      await h.page.setViewportSize({ width, height: 1000 });
+      await service.waitForFunction(narrow => document.querySelector('#rt').classList.contains('max560') === narrow, width === 390);
+      await checkLayout(`resized viewport ${width}px`, width === 1280);
+      await assertClientModelRows(alpha, 'claudecode-color');
+      if (width === 900) continue;
+      for (const dark of [false, true]) {
+        await h.page.evaluate(v => window.testTheme(v), dark);
+        await service.waitForFunction(theme => document.documentElement.dataset.theme === theme, dark ? 'dark' : 'light');
+        await capture(h.page, h.frame, `wider-source-${width}-${dark ? 'dark' : 'light'}`);
+      }
+    }
+    await service.waitForFunction(() => document.querySelectorAll('.rt-sky .pkt.held').length === 3);
+    await service.evaluate(() => { window.widthFlights = [...document.querySelectorAll('.rt-sky .pkt.held')].map(node => flightRecords.find(r => r.node === node)); });
+    for (const r of fixture.routes) { r.done = true; r.status = 200; r.ms = 900; r.tries[0].done = true; r.tries[0].status = 200; r.tries[0].ms = 900; }
+    update(harness, fixture);
+    await service.waitForFunction(() => widthFlights.every(r => !r.node.isConnected));
+    for (const flight of await service.evaluate(() => widthFlights.map(({ first, last, samples }) => ({ first, last, samples })))) {
+      assertHome(flight, flight.first.near.title.includes('Session id: alpha') ? 'alpha' : 'bravo');
+      assert.equal(flight.last.near.title, flight.first.near.title, 'resized flights return to their exact session');
+    }
+    noErrors(h);
+  });
+
   await t.test('client-icon/model-only children retain tooltip states, exact flight endpoints and native caps', async t => {
     const fixture = nativeTrace({ sessions: ['alpha', 'alpha', 'alpha', 'alpha', 'alpha', 'alpha', 'alpha', 'bravo', 'alpha'],
       agents: ['claude', 'claude', 'claude', 'claude', 'claude', 'claude', 'claude', 'claude', 'codex'] });

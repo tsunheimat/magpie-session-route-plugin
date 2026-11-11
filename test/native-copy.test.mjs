@@ -782,7 +782,7 @@ test('client/model-only source fixture and optional native reference: nested sty
           // The strict desktop checkpoint above remains a separate assertion.
           const report={engine:name,revision:REVISION,data:d,
             deliberateExtractionDifferences:JSON.parse(read('extraction-manifest.json')).dataAndPrivacyDifferences,
-            sourcePatchDifferences:['Session discriminator and tooltip','Native fit-content source width can reflow hub, account column and wires; not pixel-identical parity'],variants:[]};
+            sourcePatchDifferences:['Session discriminator and tooltip','Plugin-owned responsive source-track widening and native content sizing reflow hub, account column and wires; not pixel-identical parity'],variants:[]};
           const difference=(a,b,p='')=>{
             if(JSON.stringify(a)===JSON.stringify(b))return [];
             if(a && b && typeof a==='object' && typeof b==='object')return [...new Set([...Object.keys(a),...Object.keys(b)])].flatMap(k=>difference(a[k],b[k],p+'/'+k));
