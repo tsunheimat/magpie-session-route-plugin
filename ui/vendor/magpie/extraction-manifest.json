@@ -1,11 +1,11 @@
 {
   "revision": "3f53fa1f316330b77e5ff6d065a7a56980cafda2",
   "generator": "scripts/vendor-native-routing.mjs",
-  "generatorSha256": "aad80a36594631e18bfbae171194bba1db0047154d582ffd5319a339e8fec9a1",
+  "generatorSha256": "38d156134fe45944a7b8acff05e71be58d63cda9016f509052e859625b129d59",
   "lifecycle": "ui/native-lifecycle.inc.js",
   "lifecycleSha256": "acf0b646179d916bbf8e758c8f82321f678c9dbd9c70c13fbdd094f42f697f18",
   "baselineSha256": "1dc45c97e12665fe03fa3fe56e8fc63ad3feb2e305526d626d12526d40564383",
-  "sessionSha256": "1ef9fc542b4f578461202eacb0e566a4d269aebd11b7ec7d46e16bd153501da7",
+  "sessionSha256": "06370224415d3cb04313d6ea6e9953a2e66bb9b5ae98d31f68c23057e850dad3",
   "sessionPatch": "source-grouping-patch.json",
   "sourceRanges": [
     [
@@ -156,7 +156,7 @@
     },
     {
       "location": "source names / model subtitles",
-      "difference": "Pinned built-in client labels/icons replace installed-client inventory. A separately disclosed project basename is shown without an adjacent session ID, including a single project; model and full session remain in the tooltip. Without disclosed project metadata the existing session/model fallback remains. No folder-to-project inference. Full folder metadata is separately opt-in."
+      "difference": "Pinned built-in client labels/icons replace installed-client inventory; source-only CSS places the client name beside its icon. Disclosed project basenames appear without session IDs, followed by concrete observed main-session models. Model items move to the next line when necessary and overlong names wrap; full session and selected models remain in the tooltip. Main candidates exclude recorded actors and auxiliary kinds: active distinct models, otherwise latest eligible retained request, never a child-model fallback. Missing eligible evidence omits the model; unknown eligible models stay unknown. Retained main evidence outlives activity linger but not eviction/reset and is independent of replay. Trace has no affirmative main marker; unmarked helpers remain ambiguous. Without project metadata the short-session/unknown-source identity fallback remains. No folder-to-project inference. Full folder metadata is separately opt-in."
     },
     {
       "location": "source child activity / ui/style.css",

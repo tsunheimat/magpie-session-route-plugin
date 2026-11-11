@@ -1926,17 +1926,56 @@ function routingPage(host) {
     }
     return groups;
   }
+  function requestModel(r) {
+    const concrete = (value) => typeof value === "string" && value.length && !value.startsWith("group/");
+    return concrete(r.served) ? r.served :
+      !r.evidence?.reasons?.includes("model_unavailable") && concrete(r.model) ?
+        concrete(r.requestedModelName) ? r.requestedModelName : r.model : null;
+  }
+  function mainModels(key, map = routes) {
+    // Trace has no affirmative main marker: exclude observed actors and auxiliary calls.
+    const eligible = [...map.values()].filter((r) => sourceKey(r) === key &&
+      !r.isSubagent && !r.actorId && !r.kind).sort((a, b) => a.id - b.id);
+    const active = eligible.filter((r) => !r.done);
+    const models = new Set((active.length ? active : eligible.slice(-1)).map(requestModel));
+    return [...models].filter((m) => m !== null).sort().concat(models.has(null) ? [null] : []);
+  }
+  function sourcePresentation(a, key, staged, map = routes, clock = Date.now() + skew) {
+    const relevant = sourceRequests(key, staged, map, clock);
+    const r = relevant.at(-1) || staged.filter((r) => sourceKey(r) === key).at(-1);
+    if (!r) return;
+    const fs = foldersOf(relevant);
+    // Project disclosure is independent of full-folder disclosure. Never infer it from folder.
+    const projects = [...new Set(relevant.map((x) => x.projectName).filter(Boolean))];
+    const names = mainModels(key, map).map((m) => m ?? t("Unknown model"));
+    if (!a.label) {
+      a.label = el("span", "rt-source-label");
+      a.models = el("span", "rt-main-models");
+      a.sub.append(a.label, a.models);
+    }
+    setText(a.label, projects.length ? projects.map(lastLevel).join(", ") : sourceLabel(r));
+    const signature = JSON.stringify(names);
+    if (signature !== a.modelNames) {
+      a.models.replaceChildren(...names.map((name) => {
+        const chip = el("code", "rt-main-model");
+        setText(chip, name); setAttr(chip, "title", name);
+        return chip;
+      }));
+      a.modelNames = signature;
+    }
+    const tip = [agentName(r.agent), ...names,
+      r.session ? t("Session id") + ": " + r.session : sourceLabel(r),
+      ...projects, ...fs.map((f) => t("Folder") + ": " + f)].join("\n");
+    setAttr(a.node, "title", tip);
+  }
   function actorModels(requests) {
     const groups = new Map(), models = new Map();
-    const concrete = (value) => typeof value === "string" && value.length && !value.startsWith("group/");
     for (const r of requests) {
       if (!r.isSubagent && !r.actorId) continue;
       const key = r.actorId || null;
       let group = groups.get(key);
       if (!group) groups.set(key, group = { active: new Set(), ended: new Set() });
-      const model = concrete(r.served) ? r.served :
-        !r.evidence?.reasons?.includes("model_unavailable") && concrete(r.model) ?
-          concrete(r.requestedModelName) ? r.requestedModelName : r.model : null;
+      const model = requestModel(r);
       (r.done ? group.ended : group.active).add(model);
     }
     for (const [id, group] of groups) {
@@ -2219,13 +2258,10 @@ function routingPage(host) {
       // one agent working in more than one folder at once: which, by
       // their last level (#1068). The stage holds an agent's latest
       // request alone, so its others still going, or just done, count too.
-      const relevant = sourceRequests(id, rs), fs = foldersOf(relevant);
-      // Project disclosure is independent of full-folder disclosure. Never infer it from folder.
-      const projects = [...new Set(relevant.map((x) => x.projectName).filter(Boolean))];
+      sourcePresentation(a, id, rs);
       // told again every second (countdown): only what changed is written
-      setText(a.sub, projects.length ? projects.map(lastLevel).join(", ") : sourceLabel(r) + " · " + r.model);
-      const tip = [agentName(r.agent), r.model, r.session ? t("Session id") + ": " + r.session : sourceLabel(r), ...projects, ...fs.map((f) => t("Folder") + ": " + f)].join("\n");
-      if (a.node.title !== tip) a.node.title = tip;
+      
+      
     }
     // the account sets, the latest of each
     const latest = new Map();
@@ -2444,8 +2480,11 @@ function routingPage(host) {
     if (!cur) return;
     hubText();
     const n = now(), rs = staged();
-    // Activity reads retained gateway truth, never the synthetic replay clock/status.
-    for (const [key, a] of agents) sourceActivity(a, sourceRequests(key, rs, routes, Date.now() + skew));
+    // Source models and activity read retained truth, never synthetic replay status.
+    for (const [key, a] of agents) {
+      sourcePresentation(a, key, rs);
+      sourceActivity(a, sourceRequests(key, rs, routes, Date.now() + skew));
+    }
     const trying = new Map(), busy = new Set(); // a seat → the request it answers now
     for (const r of rs) for (const tr of r.tries) if (!tr.done) { trying.set(tryseat(r, tr), r); busy.add(sourceKey(r)); }
 

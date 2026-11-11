@@ -63,7 +63,7 @@ const activity = vm.runInNewContext(`(() => {
   const host = { generation: () => 4 }, at = Date.parse, LINGER = 12000;
   ${patched.match(/const sourceKey = \(r\) =>[\s\S]*?;\n/)[0]}
   ${SOURCE_ACTIVITY}
-  return { sourceKey, sourceRequests, actorGroups, actorModels };
+  return { sourceKey, sourceRequests, requestModel, mainModels, actorGroups, actorModels };
 })()`);
 test('activity groups every retained source-local request, without using turns, parents or a flight limit', () => {
   const r = { id: 1, time: '2026-11-09T00:00:00Z', agent: 'claude', session: 'same', done: false, actorId: 'actor_abcdefgA', isSubagent: true };
@@ -122,6 +122,9 @@ test('actor models preserve recorded names, prefer concrete served evidence and 
   ];
   for (const [fields, expected] of cases) {
     assert.deepEqual([...activity.actorModels([{ ...request, ...fields }]).get(request.actorId)], [expected], JSON.stringify(fields));
+    const main = { id: 1, agent: 'claude', session: 'model-evidence', ...fields };
+    assert.equal(activity.requestModel(main), expected, JSON.stringify(fields));
+    assert.deepEqual([...activity.mainModels(activity.sourceKey(main), new Map([[main.id, main]]))], [expected], 'main and child requests share the exact model evidence precedence');
   }
   const requests = [
     { ...request, model: 'z-model' }, { ...request, model: 'a-model' }, { ...request, model: 'a-model' },
@@ -139,6 +142,53 @@ test('actor models preserve recorded names, prefer concrete served evidence and 
   assert.equal([...models.get(null)].filter(x => x === null).length, 1);
   assert.deepEqual([...activity.actorModels([...requests].reverse()).get(request.actorId)], [...models.get(request.actorId)], 'model order does not depend on request arrival');
   assert.equal(activity.actorModels([]).size, 0);
+});
+test('main models include only exact-source unmarked requests, deduplicate active evidence and sort unknown last', () => {
+  const base = { id: 1, agent: 'claude', session: 'main-session', time: '2026-11-09T00:00:00Z', done: false };
+  const requests = [
+    { ...base, model: 'org/z-model/v1' },
+    { ...base, id: 2, model: 'a-model' },
+    { ...base, id: 3, model: 'a-model', subagentId: 'native-turn-not-an-actor', parentSession: 'other' },
+    { ...base, id: 4, model: 'group/unavailable' },
+    { ...base, id: 5 },
+    { ...base, id: 6, model: 'ended-model', done: true },
+    { ...base, id: 7, model: 'child-model', isSubagent: true },
+    { ...base, id: 8, model: 'actor-model', actorId: 'actor_example' },
+    { ...base, id: 9, model: 'title-model', kind: 'title' },
+    { ...base, id: 10, model: 'other-helper-model', kind: 'auxiliary' },
+    { ...base, id: 11, model: 'other-session-model', session: 'child-session', parentSession: base.session },
+    { ...base, id: 12, model: 'other-agent-model', agent: 'codex' },
+  ].map(r => Object.freeze(r));
+  const retained = new Map(requests.map(r => [r.id, r])), before = [...retained];
+  const key = activity.sourceKey(base);
+  assert.deepEqual([...activity.mainModels(key, retained)], ['a-model', 'org/z-model/v1', null]);
+  assert.deepEqual([...activity.mainModels(key, new Map([...retained].reverse()))], ['a-model', 'org/z-model/v1', null], 'arrival order does not affect distinct active models');
+  assert.deepEqual([...retained], before, 'main selection never mutates retained requests or map order');
+  assert.deepEqual([...activity.mainModels(activity.sourceKey(requests[10]), retained)], ['other-session-model']);
+  assert.deepEqual([...activity.mainModels(activity.sourceKey(requests[11]), retained)], ['other-agent-model']);
+  const unknown = [{ ...base, session: '', model: 'unknown-one' }, { ...base, session: '', id: 2, model: 'unknown-two' }];
+  const unknownMap = new Map(unknown.map(r => [r.id, r]));
+  for (const request of unknown) assert.deepEqual([...activity.mainModels(activity.sourceKey(request), unknownMap)], [request.model], 'unknown sessions retain their exact request boundary');
+});
+test('main models retain the latest eligible request beyond linger, forget evicted evidence and never fall back from missing models', () => {
+  const base = { agent: 'claude', session: 'retained-main', time: '2026-11-09T00:00:00Z', done: true, ms: 100 };
+  const older = { ...base, id: 1, time: '2026-11-09T00:00:10Z', model: 'older-id-model' };
+  const latest = { ...base, id: 2, model: 'org/latest-model/v2' };
+  const child = { ...base, id: 3, model: 'newer-child-model', actorId: 'actor_child', done: false };
+  const title = { ...base, id: 4, model: 'newer-title-model', kind: 'title', done: false };
+  const retained = new Map([title, latest, child, older].map(r => [r.id, r])), key = activity.sourceKey(latest);
+  assert.deepEqual([...activity.sourceRequests(key, [], retained, Date.parse(base.time) + 60000)].map(r => r.id), [3, 4], 'completed main evidence is outside activity linger');
+  assert.deepEqual([...activity.mainModels(key, retained)], ['org/latest-model/v2'], 'latest retained main is selected by id, not time or newest child');
+  latest.done = false; delete latest.model;
+  assert.deepEqual([...activity.mainModels(key, retained)], [null], 'unknown active evidence must not revive a concrete ended model');
+  latest.done = true;
+  assert.deepEqual([...activity.mainModels(key, retained)], [null], 'unknown latest-ended evidence must not revive an older model either');
+  retained.delete(latest.id);
+  assert.deepEqual([...activity.mainModels(key, retained)], ['older-id-model'], 'only still-retained eligible evidence can replace an evicted request');
+  retained.delete(older.id);
+  assert.deepEqual([...activity.mainModels(key, retained)], [], 'child and auxiliary calls cannot supply a missing main model');
+  retained.clear();
+  assert.deepEqual([...activity.mainModels(key, retained)], []);
 });
 test('active model evidence replaces ended models until all retained requests end, without mutating input', () => {
   const requests = [
@@ -192,22 +242,23 @@ test('conflicting and absent actor evidence share one aggregate rather than fabr
   assert.deepEqual({ ...activity.actorGroups(requests).get(null) }, { id: null, active: 3, ended: 0 });
   assert.deepEqual([...activity.actorModels(requests).get(null)], ['example-model']);
 });
+// Minimal DOM ports exercise the exact generated helpers; browser suites check
+// actual icon artwork, layout and interaction separately.
+const activityElement = (tagName, className = '') => ({
+  tagName, className, children: [], attributes: {}, listeners: new Map(), parent: null, text: '',
+  style: { setProperty(name, value) { this[name] = String(value); } },
+  classList: { values: new Set(), toggle(name, on) { on ? this.values.add(name) : this.values.delete(name); } },
+  get textContent() { return this.text + this.children.map(n => n.textContent).join(''); },
+  set textContent(text) { this.text = text; this.children = []; },
+  setAttribute(name, value) { this.attributes[name] = String(value); },
+  append(...nodes) { for (const node of nodes) { node.parent = this; this.children.push(node); } },
+  remove() { if (this.parent) this.parent.children = this.parent.children.filter(n => n !== this); this.parent = null; },
+  replaceChildren(...nodes) { for (const node of this.children) node.parent = null; this.children = []; this.append(...nodes); },
+  addEventListener(name, listener) { this.listeners.set(name, listener); },
+  getBoundingClientRect() { return { top: 0, bottom: 20 }; },
+});
 test('source activity renders only client icons and recorded models; request state stays in accessible metadata', () => {
-  // Minimal DOM ports exercise the exact generated renderer without a browser;
-  // browser suites separately check real icon artwork, layout and interaction.
-  const el = (tagName, className = '') => ({
-    tagName, className, children: [], attributes: {}, listeners: new Map(), parent: null, text: '',
-    style: { setProperty(name, value) { this[name] = String(value); } },
-    classList: { values: new Set(), toggle(name, on) { on ? this.values.add(name) : this.values.delete(name); } },
-    get textContent() { return this.text + this.children.map(n => n.textContent).join(''); },
-    set textContent(text) { this.text = text; this.children = []; },
-    setAttribute(name, value) { this.attributes[name] = String(value); },
-    append(...nodes) { for (const node of nodes) { node.parent = this; this.children.push(node); } },
-    remove() { if (this.parent) this.parent.children = this.parent.children.filter(n => n !== this); this.parent = null; },
-    replaceChildren(...nodes) { for (const node of this.children) node.parent = null; this.children = []; this.append(...nodes); },
-    addEventListener(name, listener) { this.listeners.set(name, listener); },
-    getBoundingClientRect() { return { top: 0, bottom: 20 }; },
-  });
+  const el = activityElement;
   const clients = JSON.parse(read('source-manifest.json')).clients;
   const render = vm.runInNewContext(`(() => { ${SOURCE_ACTIVITY}; return sourceActivity; })()`, {
     el, icon: name => { const node = el('span', 'ic'); node.setAttribute('data-icon', name); return node; },
@@ -277,23 +328,80 @@ test('source activity renders only client icons and recorded models; request sta
     assert.equal(a.node.children.length, 0);
   }
 });
-test('project summaries use explicitly disclosed same-session basenames even for one project', () => {
-  assert.match(patched, /const projects = \[\.\.\.new Set\(relevant\.map\(\(x\) => x\.projectName\)\.filter\(Boolean\)\)\]/);
-  const line = patched.match(/setText\(a\.sub, projects\.length[^\n]+/)[0];
-  const subtitle = vm.runInNewContext(`(projects, r) => {
-    const a = { sub: {} }, lastLevel = f => f.split('/').pop(), t = text => text;
+function presentationHarness(routes, clock = Date.parse('2026-11-09T00:01:00Z')) {
+  const present = vm.runInNewContext(`(() => {
+    const host = { generation: () => 4 }, at = Date.parse, LINGER = 12000, skew = 500;
+    ${patched.match(/const sourceKey = \(r\) =>[\s\S]*?;\n/)[0]}
     ${patched.match(/const sourceLabel = \(r\) =>[^\n]+/)[0]}
-    const setText = (el, text) => el.textContent = text;
-    ${line}
-    return a.sub.textContent;
-  }`);
-  assert.equal(subtitle(['專案'], { session: 'session-a', model: 'requested' }), '專案');
-  assert.equal(subtitle(['one', 'two'], { session: 'session-a', model: 'requested' }), 'one, two');
-  assert.equal(subtitle(['/disclosed/one'], { session: 'session-a', model: 'requested' }), 'one');
-  assert.equal(subtitle(['專案'], { session: 'session-b', model: 'other' }), '專案', 'equal project labels do not expose their distinct session keys');
-  assert.equal(subtitle([], { session: 'session-a', model: 'requested', folder: '/secret/no-inference' }), 'session-a · requested');
-  assert.equal(subtitle([], { session: 'session-with-a-long-id', model: 'requested' }), 'session-with… · requested');
-  assert.equal(subtitle([], { id: 7, session: '', model: 'requested' }), 'Unknown session · #7 · requested');
+    ${patched.match(/const foldersOf = [^\n]+/)[0]}
+    ${patched.match(/const lastLevel = [^\n]+/)[0]}
+    ${SOURCE_ACTIVITY}
+    return sourcePresentation;
+  })()`, {
+    routes, Date: class extends Date { static now() { return clock - 500; } },
+    el: activityElement, agentName: id => id === 'claude' ? 'Claude Code' : id,
+    t: text => text, setText: (node, text) => { node.textContent = text; },
+    setAttr: (node, name, value) => node.setAttribute(name, value),
+  });
+  const a = { node: activityElement('div', 'rt-src'), sub: activityElement('small') };
+  a.node.append(a.sub);
+  return { a, present };
+}
+test('source presentation separates disclosed project/session labels and main models without separator text', () => {
+  const base = { id: 1, agent: 'claude', session: 'session-a', model: 'requested', done: false };
+  const cases = [
+    [['專案'], base, '專案'],
+    [['one', 'two', 'one'], base, 'one, two'],
+    [['/disclosed/one'], base, 'one'],
+    [['專案'], { ...base, session: 'session-b', model: 'other' }, '專案'],
+    [[], { ...base, folder: '/secret/no-inference' }, 'session-a'],
+    [[], { ...base, session: 'session-with-a-long-id' }, 'session-with…'],
+    [[], { ...base, id: 7, session: '' }, 'Unknown session · #7'],
+  ];
+  for (const [projects, request, label] of cases) {
+    const rs = projects.length ? projects.map((projectName, i) => ({ ...request, id: i + 1, projectName })) : [request];
+    const { a, present } = presentationHarness(new Map(rs.map(r => [r.id, r])));
+    present(a, activity.sourceKey(rs[0]), rs);
+    assert.equal(a.label.textContent, label);
+    assert.deepEqual(a.sub.children.map(n => [n.tagName, n.className]), [['span', 'rt-source-label'], ['span', 'rt-main-models']]);
+    assert.equal(a.models.children.length, 1);
+    const chip = a.models.children[0];
+    assert.deepEqual([chip.tagName, chip.className, chip.textContent, chip.attributes.title], ['code', 'rt-main-model', request.model, request.model]);
+    assert.equal(a.sub.textContent, label + request.model, 'spacing is CSS, never a visible separator or duplicated model');
+    assert.equal(a.node.attributes.title, ['Claude Code', request.model, request.session ? `Session id: ${request.session}` : label,
+      ...new Set(projects), ...(request.folder ? [`Folder: ${request.folder}`] : [])].join('\n'));
+  }
+});
+test('source presentation keeps stable nodes and retained main truth independent of staged/replay children and linger', () => {
+  const base = { agent: 'claude', session: 'full-session-with-a-long-id', time: '2026-11-09T00:00:00Z' };
+  const main = { ...base, id: 1, done: true, ms: 100, model: 'org/main-model/v1', projectName: 'Old project' };
+  const child = { ...base, id: 2, actorId: 'actor_child', model: 'child-model', done: false, projectName: 'Current project', folder: '/disclosed/current' };
+  const title = { ...base, id: 3, kind: 'title', model: 'title-model', done: false, projectName: 'Current project' };
+  const map = new Map([main, child, title].map(r => [r.id, r])), key = activity.sourceKey(main);
+  const { a, present } = presentationHarness(map);
+  present(a, key, [child, title]);
+  assert.equal(a.label.textContent, 'Current project', 'project disclosure still observes linger, unlike retained main evidence');
+  assert.deepEqual(a.models.children.map(n => n.textContent), ['org/main-model/v1']);
+  assert.equal(a.node.attributes.title, 'Claude Code\norg/main-model/v1\nSession id: full-session-with-a-long-id\nCurrent project\nFolder: /disclosed/current');
+  const nodes = [a.label, a.models, ...a.models.children];
+  present(a, key, [{ ...child, model: 'synthetic-replay-child', done: true }]);
+  assert.equal([a.label, a.models, ...a.models.children].every((node, i) => node === nodes[i]), true, 'unchanged evidence preserves wrapper and model node identities');
+  main.model = 'org/updated-main/v2';
+  present(a, key, [child]);
+  assert.equal(a.label, nodes[0]); assert.equal(a.models, nodes[1]);
+  assert.notEqual(a.models.children[0], nodes[2]);
+  assert.deepEqual(a.models.children.map(n => n.textContent), ['org/updated-main/v2']);
+  map.delete(main.id);
+  present(a, key, [{ ...main, done: false }, child]);
+  assert.equal(a.label, nodes[0]); assert.equal(a.models, nodes[1]);
+  assert.equal(a.models.children.length, 0, 'a staged ghost cannot restore an evicted main, and child/title models cannot stand in for it');
+  assert.equal(a.node.attributes.title, 'Claude Code\nSession id: full-session-with-a-long-id\nCurrent project\nFolder: /disclosed/current');
+  map.set(main.id, { ...main, done: false, model: undefined });
+  map.set(4, { ...main, id: 4, done: false, model: 'a-model' });
+  map.set(5, { ...main, id: 5, done: false, model: 'z-model' });
+  present(a, key, [child]);
+  assert.deepEqual(a.models.children.map(n => n.textContent), ['a-model', 'z-model', 'Unknown model']);
+  assert.match(a.node.attributes.title, /^Claude Code\na-model\nz-model\nUnknown model\nSession id:/);
 });
 test('renderer has no core fetch/write/body/provider/history execution paths or unresolved application globals', () => {
   assert.doesNotMatch(patched, /\bfetch\s*\(|\bapi\s*\(|function (loadBodies|renderBodies|loadGroups|groupAction|renderHist|renderActs|renderCtx|loadDays|poll)\b/);
@@ -481,7 +589,12 @@ async function captureUpper(page) {
       clientIcon: node.querySelector(':scope > .ic')?.dataset.icon ?? null,
       parentClientIcon: node.closest('.rt-src')?.querySelector(':scope > .rt-ic > .ic')?.dataset.icon ?? null,
     }));
-    return {width:box.width,height:box.height,nodes,wires:[...root.querySelectorAll('.rt-wires path')].map(n=>n.getAttribute('d')),
+    const sourceHeaders = [...root.querySelectorAll('.rt-src')].map(n => ({
+      name: n.querySelector(':scope > b').textContent,
+      label: n.querySelector('.rt-source-label')?.textContent ?? null,
+      models: n.querySelector('.rt-main-models') ? [...n.querySelectorAll('.rt-main-model')].map(m => m.textContent) : [n.querySelector(':scope > small').textContent],
+    }));
+    return {width:box.width,height:box.height,nodes,sourceHeaders,wires:[...root.querySelectorAll('.rt-wires path')].map(n=>n.getAttribute('d')),
       nested: nested('.rt-accts > li.rt-sub'), actors: nested('.rt-src .rt-actor'),
       chevrons: [...root.querySelectorAll('.rt-accts > li.rt-sub > .chev > svg')].map(glyph)};
   });
@@ -609,13 +722,14 @@ test('client/model-only source fixture and optional native reference: nested sty
         assert.equal(await page.locator('.rt-src .rt-src').count(),0);
         assert.equal(await page.locator('.rt-sky .pkt').count(),4);
         assert.equal(await srcA.locator('.rt-actor').count(),18);
-        assert.equal(await srcA.locator(':scope > small').innerText(),'Shared project, Other project');
-        assert.match(await srcA.getAttribute('title'),/example-model\nSession id: project-session-a/);
+        assert.equal(await srcA.locator(':scope > small > .rt-source-label').innerText(),'Shared project, Other project');
+        assert.match(await srcA.getAttribute('title'),/^Claude Code\nSession id: project-session-a\n/);
+        assert.equal(await page.locator('.rt-src .rt-main-model').count(),0,'all-child fixtures omit main model text rather than borrowing a child model');
         const srcB=page.locator('.rt-src[title*="Session id: project-session-b"]');
         const independent=page.locator('.rt-src[title*="Session id: independent-child"]');
         assert.equal(await independent.count(),1,'parentSession never reparents');
-        assert.equal(await srcB.locator(':scope > small').innerText(),'Shared project');
-        assert.equal(await independent.locator(':scope > small').innerText(),'Shared project');
+        assert.equal(await srcB.locator(':scope > small > .rt-source-label').innerText(),'Shared project');
+        assert.equal(await independent.locator(':scope > small > .rt-source-label').innerText(),'Shared project');
         assert.notEqual(await srcB.getAttribute('title'),await independent.getAttribute('title'),'equal project labels keep distinct full-session tooltips');
         // Input/group key order, not visible labels or DOM IDs, identifies
         // collision-separated actors whose rows may show the same model.
@@ -735,8 +849,8 @@ test('client/model-only source fixture and optional native reference: nested sty
         await page.evaluate(d=>testNative.accept(d),reset);await page.waitForTimeout(100);
         assert.equal(await page.locator('.rt-src').count(),2);
         assert.equal(await page.locator('.rt-activity').count(),0,'generation reset clears child state');
-        assert.equal(await page.locator('.rt-src > small').first().innerText(),'Only project');
-        assert.equal(await page.locator('.rt-src > small').nth(1).innerText(),'same-basenam… · example-model');
+        assert.deepEqual(await page.locator('.rt-src > small > .rt-source-label').allTextContents(),['Only project','same-basenam…']);
+        assert.deepEqual(await page.locator('.rt-src > small .rt-main-model').allTextContents(),['example-model','example-model']);
         assert.doesNotMatch(await page.locator('.rt-src > small').nth(1).innerText(),/not-a-project-disclosure/);
         reset.routes[0].actorId=actorA; reset.routes[0].isSubagent=true; reset.revision++; reset.seq++;
         await page.evaluate(d=>testNative.accept(d),reset);
@@ -776,13 +890,15 @@ test('client/model-only source fixture and optional native reference: nested sty
           for(const selector of ['.rt-mode','.rt-stage','.rt-src','.rt-hub','.rt-accts','.rt-accts>li','.rt-cap','.rt-stats','.rt-steps'])
             assert.deepEqual(captures.original.nodes[selector],captures.extraction.nodes[selector],`original/extraction ${selector}`);
           assert.deepEqual(captures.original.wires,captures.extraction.wires,'original/extraction wire geometry');
-          assert.equal(captures.extraction.nodes['.rt-src'][0].text.replace('example-model','session-a · example-model'),captures.sessions.nodes['.rt-src'][0].text);
+          assert.deepEqual(captures.original.sourceHeaders,captures.extraction.sourceHeaders,'original/extraction source header text remains exact');
+          assert.deepEqual(captures.sessions.sourceHeaders,captures.extraction.sourceHeaders.map(h=>({...h,label:'session-a'})),'only the session label is added; native client name and model stay separate exact fields');
+          assert.equal(captures.extraction.nodes['.rt-src'][0].text.replace('example-model','session-aexample-model'),captures.sessions.nodes['.rt-src'][0].text,'source spacing is CSS, not new separator text');
           if(shots)fs.writeFileSync(path.join(shots,name+'-comparisons.json'),JSON.stringify(captures,null,2)+'\n');
           // Literal DOM/geometry differences, never a permissive pixel threshold.
           // The strict desktop checkpoint above remains a separate assertion.
           const report={engine:name,revision:REVISION,data:d,
             deliberateExtractionDifferences:JSON.parse(read('extraction-manifest.json')).dataAndPrivacyDifferences,
-            sourcePatchDifferences:['Session discriminator and tooltip','Plugin-owned responsive source-track widening and native content sizing reflow hub, account column and wires; not pixel-identical parity'],variants:[]};
+            sourcePatchDifferences:['Separate session/project label and retained main-model items with full-session tooltip','Inline source client icon/name and wrapping label/model row','Plugin-owned responsive source-track widening and native content sizing reflow hub, account column and wires; not pixel-identical parity'],variants:[]};
           const difference=(a,b,p='')=>{
             if(JSON.stringify(a)===JSON.stringify(b))return [];
             if(a && b && typeof a==='object' && typeof b==='object')return [...new Set([...Object.keys(a),...Object.keys(b)])].flatMap(k=>difference(a[k],b[k],p+'/'+k));
@@ -826,6 +942,8 @@ test('client/model-only source fixture and optional native reference: nested sty
             for(const selector of ['.rt-mode','.rt-hub','.rt-accts>li','.rt-stats','.rt-steps']){
               assert.deepEqual(baseline.nodes[selector].map(n=>({text:n.text,style:n.style})),session.nodes[selector].map(n=>({text:n.text,style:n.style})),`${size}/${theme}/${motion} extraction-session ${selector}`);
             }
+            assert.deepEqual(original.sourceHeaders,baseline.sourceHeaders,`${size}/${theme}/${motion} original-extraction source header fields`);
+            assert.deepEqual(session.sourceHeaders,baseline.sourceHeaders.map(h=>({...h,label:'session-a'})),`${size}/${theme}/${motion} exact session source label and model fields`);
             variant.originalToExtraction=difference(original,baseline);
             variant.extractionToSession=difference(baseline,session);
             report.variants.push(variant);
